@@ -1,0 +1,16 @@
+# Project: supabill
+# Ecosystem: Typescript
+
+You are working on a TypeScript project.
+Runtime: node
+Package manager: pnpm
+Frontend: next
+Backend: hono
+Database: postgres with drizzle
+Auth: better-auth
+Testing: jest
+Validation: zod
+
+Follow existing code patterns and conventions.
+Use the established project structure.
+Keep this file updated when the project structure changes.

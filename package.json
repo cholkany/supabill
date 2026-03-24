@@ -1,0 +1,37 @@
+{
+  "name": "supabill",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "dev:native": "turbo -F native dev",
+    "dev:web": "turbo -F web dev",
+    "dev:server": "turbo -F server dev",
+    "db:push": "turbo -F @supabill/db db:push",
+    "db:studio": "turbo -F @supabill/db db:studio",
+    "db:generate": "turbo -F @supabill/db db:generate",
+    "db:migrate": "turbo -F @supabill/db db:migrate",
+    "db:start": "turbo -F @supabill/db db:start",
+    "db:watch": "turbo -F @supabill/db db:watch",
+    "db:stop": "turbo -F @supabill/db db:stop",
+    "db:down": "turbo -F @supabill/db db:down"
+  },
+  "dependencies": {
+    "@supabill/env": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@supabill/config": "workspace:*",
+    "@types/node": "^22.13.14",
+    "turbo": "^2.6.3",
+    "typescript": "catalog:"
+  },
+  "packageManager": "pnpm@10.15.1"
+}
