@@ -1,29 +1,31 @@
-# Dockerfile for supabill server
-# Optimized multi-stage build for Docker deployment
-
+# -------------------------
 # Build stage
+# -------------------------
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install pnpm/yarn if needed
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
-COPY apps/server/package.json ./apps/server/
-COPY packages/db/package.json ./packages/db/
+# Copy lockfile and fetch dependencies (cache layer)
+COPY pnpm-lock.yaml ./
+RUN pnpm fetch
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Copy workspace config and source
+COPY package.json pnpm-workspace.yaml turbo.json* ./
+COPY packages ./packages
+COPY apps ./apps
 
-# Copy source code
-COPY . .
+# Install all deps offline
+RUN pnpm install --frozen-lockfile --offline
 
-# Build the application
-RUN pnpm run build --filter=@supabill/server
+# build server
+RUN pnpm --filter server build
 
+
+# -------------------------
 # Production stage
+# -------------------------
 FROM node:20-alpine AS runner
 
 WORKDIR /app
@@ -33,13 +35,14 @@ ENV PORT=3000
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy built application
-COPY --from=builder /app/apps/server/dist ./dist
-COPY --from=builder /app/apps/server/package.json ./
-
-# Install production dependencies only
-RUN pnpm install --prod --frozen-lockfile
+# ✅ Now this works
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/server/dist ./apps/server/dist
+COPY --from=builder /app/apps/server/package.json ./apps/server/
+COPY --from=builder /app/apps/server/node_modules ./apps/server/node_modules
 
 EXPOSE 3000
 
-CMD ["node", "dist/index.js"]
+WORKDIR /app/apps/server
+CMD ["node", "dist/index.mjs"]

@@ -5,29 +5,34 @@ import { ModeToggle } from "./mode-toggle";
 import UserMenu from "./user-menu";
 
 export default function Header() {
-  const links = [
+  const links: Array<{ to: string; label: string }> = [
     { to: "/", label: "Home" },
-    { to: "/dashboard", label: "Dashboard" },
-  ] as const;
+    { to: "/routers", label: "Routers" },
+    { to: "/routers/new", label: "Add Router" },
+  ];
 
   return (
-    <div>
-      <div className="flex flex-row items-center justify-between px-2 py-1">
-        <nav className="flex gap-4 text-lg">
+    <div className="border-b border-foreground/10 bg-background/80 backdrop-blur">
+      <div className="mx-auto flex max-w-7xl flex-row items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-6">
+          <a href="/" className="text-sm font-semibold uppercase tracking-[0.3em] text-primary">
+            Supabill
+          </a>
+          <nav className="flex gap-4 text-sm text-muted-foreground">
           {links.map(({ to, label }) => {
             return (
-              <Link key={to} href={to}>
+              <Link key={to} href={to as never}>
                 {label}
               </Link>
             );
           })}
-        </nav>
+          </nav>
+        </div>
         <div className="flex items-center gap-2">
           <ModeToggle />
           <UserMenu />
         </div>
       </div>
-      <hr />
     </div>
   );
 }

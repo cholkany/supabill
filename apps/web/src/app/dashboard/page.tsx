@@ -1,27 +1,9 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import type { Route } from "next";
 
-import { authClient } from "@/lib/auth-client";
-
-import Dashboard from "./dashboard";
+import { requireUserSession } from "@/lib/session";
 
 export default async function DashboardPage() {
-  const session = await authClient.getSession({
-    fetchOptions: {
-      headers: await headers(),
-      throw: true,
-    },
-  });
-
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>Welcome {session.user.name}</p>
-      <Dashboard session={session} />
-    </div>
-  );
+  await requireUserSession();
+  redirect("/routers" as Route);
 }

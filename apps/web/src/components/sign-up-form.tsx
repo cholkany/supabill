@@ -1,4 +1,5 @@
 import { useForm } from "@tanstack/react-form";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import z from "zod";
@@ -29,7 +30,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
         },
         {
           onSuccess: () => {
-            router.push("/dashboard");
+            router.push("/routers" as Route);
             toast.success("Sign up successful");
           },
           onError: (error) => {
@@ -148,7 +149,7 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
         <Button
           variant="link"
           onClick={onSwitchToSignIn}
-          className="text-indigo-600 hover:text-indigo-800"
+          className="text-primary hover:text-primary/80"
         >
           Already have an account? Sign In
         </Button>

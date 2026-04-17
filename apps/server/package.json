@@ -17,7 +17,9 @@
     "ai": "^6.0.3",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.1",
     "hono": "^4.8.2",
+    "node-routeros": "^1.6.9",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -6,14 +6,17 @@ name: supabill
 services:
   web:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        - NEXT_PUBLIC_SERVER_URL=http://localhost:3001
     container_name: supabill-web
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - VITE_API_URL=http://server:3001
+      - NEXT_PUBLIC_SERVER_URL=http://localhost:3001
+      - INTERNAL_SERVER_URL=http://server:3000
     restart: unless-stopped
     depends_on:
       - server
@@ -22,8 +25,8 @@ services:
 
   server:
     build:
-      context: ./apps/server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/server/Dockerfile
     container_name: supabill-server
     ports:
       - "3001:3000"
@@ -31,6 +34,9 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_URL=postgresql://postgres:password@db:5432/supabill
+      - BETTER_AUTH_SECRET=supabill-secret-key-development-12345
+      - BETTER_AUTH_URL=http://localhost:3001
+      - CORS_ORIGIN=http://localhost:3000
     restart: unless-stopped
     depends_on:
       - db

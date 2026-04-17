@@ -1,32 +1,43 @@
-# Dockerfile for supabill Next.js app
-# Optimized multi-stage build for Docker deployment
+# Dockerfile for supabill Next.js app (monorepo compatible)
 
 FROM node:20-alpine AS base
 
-# Install dependencies only when needed
-FROM base AS deps
+# -------------------------
+# Build stage
+# -------------------------
+FROM base AS builder
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
-COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
+# Copy lockfile and fetch dependencies (cache layer)
+COPY pnpm-lock.yaml ./
+RUN pnpm fetch
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Copy workspace config
+COPY package.json pnpm-workspace.yaml turbo.json* ./
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+# Copy monorepo source
+COPY apps ./apps
+COPY packages ./packages
 
-# Disable telemetry during build
+# Install all deps offline
+RUN pnpm install --frozen-lockfile --offline
+
+# Disable telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm run build
+ARG NEXT_PUBLIC_SERVER_URL
+ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
 
-# Production image, copy all the files and run next
+# Build only the web app
+RUN pnpm --filter web build && mkdir -p /app/apps/web/public
+
+
+# -------------------------
+# Production stage
+# -------------------------
 FROM base AS runner
 WORKDIR /app
 
@@ -38,14 +49,13 @@ ENV HOSTNAME="0.0.0.0"
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
-
-# Automatically leverage output traces to reduce image size
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Copy built app (requires output: "standalone" in next.config)
+COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 
 USER nextjs
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["node", "apps/web/server.js"]

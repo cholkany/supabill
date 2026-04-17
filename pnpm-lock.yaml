@@ -84,9 +84,15 @@ importers:
       dotenv:
         specifier: 'catalog:'
         version: 17.3.1
+      drizzle-orm:
+        specifier: ^0.45.1
+        version: 0.45.1(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(kysely@0.28.14)(pg@8.20.0)
       hono:
         specifier: ^4.8.2
         version: 4.12.9
+      node-routeros:
+        specifier: ^1.6.9
+        version: 1.6.9
       zod:
         specifier: 'catalog:'
         version: 4.3.6
@@ -4342,6 +4348,10 @@ packages:
 
   node-releases@2.0.36:
     resolution: {integrity: sha512-TdC8FSgHz8Mwtw9g5L4gR/Sh9XhSP/0DEkQxfEFXOpiul5IiHgHan2VhYYb6agDSfp4KuvltmGApc8HMgUrIkA==}
+
+  node-routeros@1.6.9:
+    resolution: {integrity: sha512-/dW1yDNvTxkd3KjTFgRYlVWPg3MHAcuPNKh9v0j+0ilK9G3/drgiAZ5NiKj3egHjNcxMxQ9L3KY8BKIfd3x75Q==}
+    deprecated: node-routeros has been discontinued
 
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
@@ -9322,6 +9332,13 @@ snapshots:
   node-int64@0.4.0: {}
 
   node-releases@2.0.36: {}
+
+  node-routeros@1.6.9:
+    dependencies:
+      debug: 4.4.3
+      iconv-lite: 0.7.2
+    transitivePeerDependencies:
+      - supports-color
 
   normalize-path@3.0.0: {}
 
