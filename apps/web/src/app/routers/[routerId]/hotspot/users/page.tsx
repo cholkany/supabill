@@ -1,6 +1,12 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppSidebar } from "@/components/dashboard/dashboard-sidebar";
+import { NavBar } from "@/components/dashboard/nav-bar";
+import { HotspotProfilesTable } from "@/components/hotspot/profiles-table";
+import HotspotUsersTable from "@/components/hotspot/users-table";
+import { Button } from "@/components/ui/button";
+import { SidebarInset } from "@/components/ui/sidebar";
 import { getRouterDashboard } from "@/lib/router-flow";
 import { requireUserSession } from "@/lib/session";
+import { PlusIcon } from "lucide-react";
 
 export default async function RouterHotspotUsersPage({
   params,
@@ -14,20 +20,22 @@ export default async function RouterHotspotUsersPage({
   });
 
   return (
-    <section className="grid gap-4">
-      {router.hotspotUsers.map((user) => (
-        <Card key={user.id} className="rounded-2xl border-foreground/10 bg-background/90">
-          <CardHeader>
-            <CardTitle>{user.username}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-1 text-sm text-muted-foreground">
-            <p>Profile: {user.profile}</p>
-            <p>Status: {user.status}</p>
-            <p>IP address: {user.ipAddress}</p>
-            <p>Uptime: {user.uptime}</p>
-          </CardContent>
-        </Card>
-      ))}
-    </section>
+    <>
+      <AppSidebar routerId={routerId} />
+      <SidebarInset>
+        <NavBar title={"Hotspot Users"} />
+        <div className="flex flex-1 flex-col gap-4 p-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+              <h2 className="text-2xl font-bold">Hotspot Users</h2>
+              <p className="text-sm text-muted-foreground mt-1">Manage users for your hotspot profiles.</p>
+            </div>
+          </div>
+          <HotspotUsersTable users={router.hotspotUsers} />
+        </div>
+      </SidebarInset>
+    </>
   );
 }
+
+
