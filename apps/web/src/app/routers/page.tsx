@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getUserRouters } from "@/lib/router-flow";
 import { requireUserSession } from "@/lib/session";
+import { DeleteRouterButton } from "./delete-router-button";
 
 export default async function RoutersPage() {
   const session = await requireUserSession();
@@ -52,6 +53,7 @@ export default async function RoutersPage() {
                 <Link href={`/routers/${router.id}` as Route}>
                   <Button variant="outline">Open dashboard</Button>
                 </Link>
+                <DeleteRouterButton routerId={router.id} />
               </CardContent>
             </Card>
           ))}

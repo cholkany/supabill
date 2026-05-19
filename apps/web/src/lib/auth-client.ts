@@ -1,6 +1,6 @@
-import { env } from "@supabill/env/web";
 import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({
-  baseURL: env.NEXT_PUBLIC_SERVER_URL,
+  baseURL: typeof window !== "undefined" ? window.location.origin : "http://localhost:3001",
+  basePath: "/api/auth",
 });

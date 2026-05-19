@@ -57,7 +57,9 @@ function pickNumber(item: Record<string, unknown>, key: string, fallback = 0) {
   return fallback;
 }
 
-async function connect(input: RouterConnectionInput) {
+export type { RouterConnectionInput };
+
+export async function connect(input: RouterConnectionInput) {
   const conn = new RouterOSAPI({
     host: input.host,
     user: input.username,
@@ -71,13 +73,25 @@ async function connect(input: RouterConnectionInput) {
   return conn;
 }
 
+// Per-command timeout — shorter than the connection timeout.
+// Required because node-routeros throws synchronously from event handlers on
+// "!empty" replies (a library bug), which leaves conn.write()'s promise
+// permanently unresolved. The race ensures safeWrite always settles.
+const COMMAND_TIMEOUT_MS = Math.min(env.ROUTER_API_TIMEOUT_MS - 1000, 6000);
+
 async function safeWrite(
   conn: RouterOSAPI,
   command: string | string[],
   ...args: Array<string | string[]>
 ) {
   try {
-    const response = await conn.write(command, ...args);
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`RouterOS command timed out: ${Array.isArray(command) ? command[0] : command}`)),
+        COMMAND_TIMEOUT_MS,
+      ),
+    );
+    const response = await Promise.race([conn.write(command, ...args), timeout]);
     return Array.isArray(response) ? response : [];
   } catch {
     return [];
@@ -200,27 +214,87 @@ export async function applyRouterHotspotSetup(
 ) {
   const conn = await connect(input);
 
-  try {
-    await safeWrite(conn, "/interface/bridge/add", `=name=${options.bridgeName}`);
+  const bridge      = options.bridgeName;          // "supabill-hotspot"
+  const hotspotIp   = "10.55.0.1";
+  const hotspotCidr = "10.55.0.1/24";
+  const poolRange   = "10.55.0.10-10.55.0.250";
+  const poolName    = "supabill-pool";
+  const profileName = "supabill-default";
+  const hotspotName = "supabill-hotspot";
 
+  // Helper: read record list and find first match by field value
+  function findByField(
+    list: Record<string, unknown>[],
+    field: string,
+    value: string,
+  ): Record<string, unknown> | undefined {
+    return list.find((item) => item[field] === value);
+  }
+
+  try {
+    // ── 1. Bridge ──────────────────────────────────────────────────────────
+    // Create only if not already present (running twice would fail without the check)
+    const bridges = await safeWrite(conn, "/interface/bridge/print") as Record<string, unknown>[];
+    if (!findByField(bridges, "name", bridge)) {
+      await safeWrite(conn, "/interface/bridge/add", `=name=${bridge}`, "=protocol-mode=none");
+    }
+
+    // ── 2. Attach selected ports to the bridge ─────────────────────────────
+    // A port that is already enslaved to ANY bridge must be removed first,
+    // otherwise /interface/bridge/port/add silently fails.
+    const bridgePorts = await safeWrite(conn, "/interface/bridge/port/print") as Record<string, unknown>[];
     for (const port of options.ports) {
+      const existing = findByField(bridgePorts, "interface", port);
+      if (existing) {
+        // Already in a bridge — remove it so we can re-assign
+        if (existing[".id"]) {
+          await safeWrite(conn, "/interface/bridge/port/remove", `=.id=${existing[".id"] as string}`);
+        }
+      }
+      await safeWrite(conn, "/interface/bridge/port/add", `=bridge=${bridge}`, `=interface=${port}`);
+    }
+
+    // ── 3. Assign IP address to the bridge ────────────────────────────────
+    // Required: the hotspot server binds to this address.
+    const addresses = await safeWrite(conn, "/ip/address/print") as Record<string, unknown>[];
+    if (!findByField(addresses, "interface", bridge)) {
+      await safeWrite(conn, "/ip/address/add", `=address=${hotspotCidr}`, `=interface=${bridge}`);
+    }
+
+    // ── 4. IP pool ────────────────────────────────────────────────────────
+    const pools = await safeWrite(conn, "/ip/pool/print") as Record<string, unknown>[];
+    if (!findByField(pools, "name", poolName)) {
+      await safeWrite(conn, "/ip/pool/add", `=name=${poolName}`, `=ranges=${poolRange}`);
+    }
+
+    // ── 5. Hotspot server profile ─────────────────────────────────────────
+    const profiles = await safeWrite(conn, "/ip/hotspot/profile/print") as Record<string, unknown>[];
+    if (!findByField(profiles, "name", profileName)) {
       await safeWrite(
         conn,
-        "/interface/bridge/port/add",
-        `=bridge=${options.bridgeName}`,
-        `=interface=${port}`,
+        "/ip/hotspot/profile/add",
+        `=name=${profileName}`,
+        `=hotspot-address=${hotspotIp}`,
+        "=dns-name=login.supabill.local",
+        "=rate-limit=10M/10M",
       );
     }
 
-    await safeWrite(conn, "/ip/pool/add", "=name=supabill-pool", "=ranges=10.55.0.10-10.55.0.250");
-    await safeWrite(
-      conn,
-      "/ip/hotspot/profile/add",
-      "=name=supabill-default",
-      "=hotspot-address=10.55.0.1",
-      "=dns-name=login.supabill.local",
-      "=rate-limit=10M/10M",
-    );
+    // ── 6. Hotspot server (the actual enabled hotspot) ────────────────────
+    // This is what was missing — without /ip/hotspot/add the clients never
+    // hit a captive portal regardless of how many profiles exist.
+    const hotspots = await safeWrite(conn, "/ip/hotspot/print") as Record<string, unknown>[];
+    if (!findByField(hotspots, "interface", bridge)) {
+      await safeWrite(
+        conn,
+        "/ip/hotspot/add",
+        `=name=${hotspotName}`,
+        `=interface=${bridge}`,
+        `=address-pool=${poolName}`,
+        `=profile=${profileName}`,
+        "=disabled=no",
+      );
+    }
   } finally {
     await conn.close().catch(() => undefined);
   }

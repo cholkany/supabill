@@ -117,8 +117,8 @@ async function routerFetch<T>(path: string, init: RouterFetchInit): Promise<T> {
   }
 
   const baseUrl = typeof window === "undefined" 
-    ? (env.INTERNAL_SERVER_URL || env.NEXT_PUBLIC_SERVER_URL)
-    : env.NEXT_PUBLIC_SERVER_URL;
+    ? (env.INTERNAL_SERVER_URL ?? env.NEXT_PUBLIC_SERVER_URL)
+    : ""; // browser: use relative URL so middleware proxies to the server
 
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
@@ -215,5 +215,60 @@ export async function getRouterDashboard(routerId: string, options?: { cookieHea
   return routerFetch<RouterDashboardData>(`/api/routers/${routerId}`, {
     method: "GET",
     cookieHeader: options?.cookieHeader,
+  });
+}
+
+// ── WireGuard ──────────────────────────────────────────────────────────────
+
+export type WireguardStatus =
+  | { configured: false }
+  | {
+      configured: true;
+      status: "pending" | "applied" | "error";
+      lastError: string | null;
+      appliedAt: string | null;
+      routerPublicKey: string;
+      routerTunnelIp: string;
+      peerPublicKey: string;
+      peerTunnelIp: string;
+      endpoint: string;
+      listenPort: number;
+      wanHost: string | null;
+      clientConfig: string;
+    };
+
+export async function getWireguardStatus(
+  routerId: string,
+  options?: { cookieHeader?: string },
+): Promise<WireguardStatus> {
+  return routerFetch<WireguardStatus>(`/api/routers/${routerId}/wireguard`, {
+    method: "GET",
+    cookieHeader: options?.cookieHeader,
+  });
+}
+
+export async function provisionRouterWireguard(
+  routerId: string,
+  wanHost?: string,
+): Promise<{ success: true }> {
+  return routerFetch<{ success: true }>(`/api/routers/${routerId}/wireguard/provision`, {
+    method: "POST",
+    body: JSON.stringify({ wanHost }),
+  });
+}
+
+export type WireguardProbeResult = {
+  configured: true;
+  tunnelIp: string;
+  wireguard:
+    | { ok: false; reason: "no-interface" | "no-peer" | "exec-failed"; message?: string }
+    | { ok: true; interfaceName: string; peerPublicKey: string; lastHandshakeAt: string | null };
+  routerOs: { ok: boolean; identity?: string; error?: string };
+  elapsedMs: number;
+};
+
+export async function probeRouterWireguard(routerId: string): Promise<WireguardProbeResult> {
+  return routerFetch<WireguardProbeResult>(`/api/routers/${routerId}/wireguard/probe`, {
+    method: "POST",
   });
 }

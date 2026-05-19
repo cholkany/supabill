@@ -9,9 +9,19 @@ export const env = createEnv({
     BETTER_AUTH_URL: z.url(),
     CORS_ORIGIN: z.url(),
     ROUTER_CREDENTIALS_KEY: z.string().min(32).optional(),
-    ROUTER_PROVISION_BASE_URL: z.url().optional(),
+    // Publicly reachable base URL (DNS name) used in the RouterOS provision script.
+    // e.g. https://api.yourdomain.com  — must be reachable by the MikroTik router.
+    SERVER_PUBLIC_URL: z.url().optional(),
+    // Supabill's publicly reachable hostname/IP — MikroTik routers dial TO this as WG client.
+    WG_PUBLIC_HOST: z.string().optional(),
+    WG_LISTEN_PORT: z.coerce.number().int().default(51820),
+    // Directory where per-router wg peer configs are written (read by the wireguard Docker service).
+    WG_CONFS_DIR: z.string().optional(),
     ROUTER_API_TIMEOUT_MS: z.coerce.number().int().min(2000).max(30000).default(7000),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+    MIKROTIK_LAN_IP: z.string().optional(),
+    MIKROTIK_USERNAME: z.string().optional(),
+    MIKROTIK_PASSWORD: z.string().optional(),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,

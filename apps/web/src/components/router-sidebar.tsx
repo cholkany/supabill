@@ -28,16 +28,22 @@ export default function RouterSidebar({ routerId }: { routerId: string }) {
             >
               Users
             </Link>
+            <Link
+              className="rounded-md px-2 py-1.5 hover:bg-foreground/[0.05]"
+              href={`${base}/hotspot/vouchers` as Route}
+            >
+              Vouchers
+            </Link>
           </div>
         </details>
         <Link className="rounded-lg px-3 py-2 hover:bg-foreground/[0.05]" href={`${base}/logs` as Route}>
           Logs
         </Link>
-        <Link
-          className="rounded-lg px-3 py-2 hover:bg-foreground/[0.05]"
-          href={`${base}/system-monitor` as Route}
-        >
+        <Link className="rounded-lg px-3 py-2 hover:bg-foreground/[0.05]" href={`${base}/system-monitor` as Route}>
           System monitor
+        </Link>
+        <Link className="rounded-lg px-3 py-2 hover:bg-foreground/[0.05]" href={`${base}/wireguard` as Route}>
+          WireGuard
         </Link>
         <Link className="rounded-lg px-3 py-2 hover:bg-foreground/[0.05]" href={`${base}/reports` as Route}>
           Reports

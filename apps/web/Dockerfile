@@ -28,9 +28,6 @@ RUN pnpm install --frozen-lockfile --offline
 # Disable telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
 
-ARG NEXT_PUBLIC_SERVER_URL
-ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
-
 # Build only the web app
 RUN pnpm --filter web build && mkdir -p /app/apps/web/public
 

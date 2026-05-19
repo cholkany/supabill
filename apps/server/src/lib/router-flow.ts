@@ -6,11 +6,13 @@ import {
   managedRouterLog,
   managedRouterSetup,
   managedRouterStatusEnum,
+  managedRouterWireguard,
 } from "@supabill/db/schema";
 import { env } from "@supabill/env/server";
 
 import { decryptSecret, encryptSecret, generateRouterPassword } from "./router-crypto.js";
 import { applyRouterHotspotSetup, getRouterLiveSnapshot, probeRouter } from "./routeros-probe.js";
+import { provisionWireguard } from "./wireguard.js";
 
 type SetupStatus = (typeof managedRouterSetup.$inferSelect)["status"];
 type RouterStatus = (typeof managedRouterStatusEnum.enumValues)[number];
@@ -132,7 +134,7 @@ function generateApiUsername(setupId: string) {
 }
 
 function getProvisionBaseUrl(serverBaseUrl: string) {
-  return (env.ROUTER_PROVISION_BASE_URL ?? serverBaseUrl).replace(/\/$/, "");
+  return (env.SERVER_PUBLIC_URL ?? serverBaseUrl).replace(/\/$/, "");
 }
 
 async function appendRouterLog(routerId: string, level: "info" | "warning" | "error", message: string) {
@@ -238,9 +240,11 @@ export async function startRouterSetup({
   const apiUsername = generateApiUsername(setupId);
   const apiPassword = generateRouterPassword(26);
   const provisionScript = [
-    `/tool fetch mode=http url="${provisionUrl}" dst-path=supabill-setup.rsc`,
+    `/tool fetch mode=http url="${provisionUrl}" http-header-field="ngrok-skip-browser-warning:true" dst-path=supabill-setup.rsc`,
     "/import file-name=supabill-setup.rsc",
   ].join("; ");
+
+  const routerId = crypto.randomUUID();
 
   await db.insert(managedRouterSetup).values({
     id: setupId,
@@ -254,8 +258,34 @@ export async function startRouterSetup({
     provisionScript,
     apiUsername,
     apiPasswordEncrypted: encryptSecret(apiPassword),
+    completedRouterId: null, // set to null initially to avoid cyclic foreign key issues
     setupLogs: [getSetupLogMessage(`Setup created for ${routerName}`)],
   });
+
+  await db.insert(managedRouter).values({
+    id: routerId,
+    userId,
+    setupId: setupId,
+    name: routerName,
+    location,
+    host: "10.100.1.1", // Temporary WireGuard fallback
+    apiPort: 8728,
+    apiUsername,
+    apiPasswordEncrypted: encryptSecret(apiPassword),
+    status: "warning",
+    wanPort: "ether1",
+    hotspotPorts: [],
+    timezone: "Africa/Juba",
+    dnsServers: ["1.1.1.1", "8.8.8.8"],
+    ntpServers: ["pool.ntp.org"],
+    lastSeenAt: new Date(),
+  });
+
+  await db.update(managedRouterSetup)
+    .set({ completedRouterId: routerId })
+    .where(eq(managedRouterSetup.id, setupId));
+
+  void provisionWireguard(routerId, userId, new URL(serverBaseUrl).hostname);
 
   return {
     setupId,
@@ -334,6 +364,7 @@ export async function markProvisionFetched({
     setupId: setup.id,
     apiUsername: setup.apiUsername,
     apiPassword: decryptSecret(setup.apiPasswordEncrypted),
+    completedRouterId: setup.completedRouterId,
   };
 }
 
@@ -354,7 +385,17 @@ export async function testSetupConnectivity({
     return null;
   }
 
-  const host = normalizeHost(hostOverride) ?? setup.detectedHost;
+  let wgIp: string | null = null;
+  if (setup.completedRouterId) {
+    const wg = await db.query.managedRouterWireguard.findFirst({
+      where: eq(managedRouterWireguard.routerId, setup.completedRouterId),
+    });
+    if (wg?.peerTunnelIp) {
+      wgIp = wg.peerTunnelIp.split("/")[0] ?? null;  // MikroTik's tunnel address
+    }
+  }
+
+  const host = normalizeHost(hostOverride) || wgIp || setup.detectedHost;
   if (!host) {
     return {
       error:
@@ -649,3 +690,23 @@ export async function getRouterDashboard({
     },
   };
 }
+
+export async function deleteRouter(
+  routerId: string,
+  userId: string
+): Promise<{ success: boolean }> {
+  const router = await db.query.managedRouter.findFirst({
+    where: and(eq(managedRouter.id, routerId), eq(managedRouter.userId, userId)),
+  });
+
+  if (!router) {
+    return { success: false };
+  }
+
+  await db.delete(managedRouter).where(eq(managedRouter.id, routerId));
+
+  return { success: true };
+}
+
+
+

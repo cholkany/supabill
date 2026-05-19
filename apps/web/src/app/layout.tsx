@@ -1,24 +1,30 @@
+// For adding custom fonts with other frameworks, see:
+// https://tailwindcss.com/docs/font-family
 import type { Metadata } from "next";
+import { Geist, Noto_Serif_Georgian, Geist_Mono } from "next/font/google";
+import { ThemeProvider } from "next-themes";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import './globals.css'
 
-import { Geist, Geist_Mono } from "next/font/google";
-
-import "../index.css";
-import Header from "@/components/header";
-import Providers from "@/components/providers";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const fontSans = Geist({
   subsets: ["latin"],
+  variable: "--font-sans",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const fontSerif = Noto_Serif_Georgian({
   subsets: ["latin"],
+  variable: "--font-serif",
+});
+
+const fontMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
-  title: "supabill",
-  description: "supabill",
+  title: "Supabill",
+  description: "Supabill dashboard",
 };
 
 export default function RootLayout({
@@ -28,13 +34,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Providers>
-          <div className="grid grid-rows-[auto_1fr] h-svh">
-            <Header />
-            {children}
-          </div>
-        </Providers>
+      <body className={`${fontSans.variable} ${fontSerif.variable} ${fontMono.variable} antialiased`}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          <TooltipProvider>
+            <SidebarProvider>
+              {children}
+            </SidebarProvider>
+          </TooltipProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

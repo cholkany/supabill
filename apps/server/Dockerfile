@@ -33,6 +33,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
+RUN apk add --no-cache wireguard-tools bash
+
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # ✅ Now this works

@@ -12,6 +12,7 @@ import {
   testRouterSetupAccessibility,
   type RouterSetupState,
 } from "@/lib/router-flow";
+import { env } from "@supabill/env/web";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -155,14 +156,23 @@ export default function RouterSetupWizard() {
                 {setupState.provisionScript}
               </pre>
 
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-400">
+                <p className="font-medium">Router IP required for connectivity test</p>
+                <p className="mt-1 text-xs opacity-80">
+                  Because provisioning goes through a tunnel (ngrok), the server cannot auto-detect your router&apos;s
+                  real IP. Enter the router&apos;s <strong>LAN IP</strong> (e.g. <code>192.168.88.1</code>) or its
+                  WireGuard tunnel IP below before testing.
+                </p>
+              </div>
+
               <div className="flex flex-wrap gap-3">
                 <div className="min-w-[260px] flex-1">
-                  <Label htmlFor="router-host">Router host (optional override)</Label>
+                  <Label htmlFor="router-host">Router IP address <span className="text-destructive">*</span></Label>
                   <Input
                     id="router-host"
                     value={routerHost}
                     onChange={(event) => setRouterHost(event.target.value)}
-                    placeholder="192.168.88.1 or router.example.com"
+                    placeholder="192.168.88.1"
                   />
                 </div>
               </div>
@@ -181,7 +191,12 @@ export default function RouterSetupWizard() {
                 <a href={setupState.provisionUrl} target="_blank" rel="noreferrer">
                   <Button variant="outline">Open provision URL</Button>
                 </a>
-                <Button disabled={loading} onClick={handleStep2Test}>
+                <a href={`${env.NEXT_PUBLIC_SERVER_URL}/api/routers/${setupState.completedRouterId}/wireguard/client-config`} download="supabill-wg.conf">
+                  <Button type="button" variant="secondary" className="bg-blue-600 text-white hover:bg-blue-700">
+                    Download WG Client Config
+                  </Button>
+                </a>
+                <Button disabled={loading || !routerHost.trim()} onClick={handleStep2Test}>
                   {loading ? "Testing..." : "Test router accessibility"}
                 </Button>
               </div>
@@ -198,6 +213,7 @@ export default function RouterSetupWizard() {
               ) : null}
             </div>
           ) : null}
+
 
           {step === 3 && setupState ? (
             <div className="grid gap-4">

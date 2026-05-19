@@ -1,6 +1,12 @@
+import { AppSidebar } from "@/components/dashboard/dashboard-sidebar";
+import { NavBar } from "@/components/dashboard/nav-bar";
+import { HotspotProfilesTable } from "@/components/hotspot/profiles-table";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SidebarInset } from "@/components/ui/sidebar";
 import { getRouterDashboard } from "@/lib/router-flow";
 import { requireUserSession } from "@/lib/session";
+import { PlusIcon } from "lucide-react";
 
 export default async function RouterHotspotProfilesPage({
   params,
@@ -14,19 +20,24 @@ export default async function RouterHotspotProfilesPage({
   });
 
   return (
-    <section className="grid gap-4">
-      {router.hotspotProfiles.map((profile) => (
-        <Card key={profile.id} className="rounded-2xl border-foreground/10 bg-background/90">
-          <CardHeader>
-            <CardTitle>{profile.name}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-1 text-sm text-muted-foreground">
-            <p>Rate limit: {profile.rateLimit}</p>
-            <p>Shared users: {profile.sharedUsers}</p>
-            <p>Session timeout: {profile.sessionTimeoutMinutes} min</p>
-          </CardContent>
-        </Card>
-      ))}
-    </section>
+    <>
+      <AppSidebar routerId={routerId} />
+      <SidebarInset>
+        <NavBar title={"Hotspot Profiles"} />
+        <div className="flex flex-1 flex-col gap-4 p-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+              <h2 className="text-2xl font-bold">Hotspot Profiles</h2>
+              <p className="text-sm text-muted-foreground mt-1">Manage bandwidth plans, pricing, and access policies for your hotspot users.</p>
+            </div>
+            <Button variant="default">
+              <PlusIcon className="size-4 mr-2" />
+              Create New Profile
+            </Button>
+          </div>
+            <HotspotProfilesTable profiles={router.hotspotProfiles} />
+        </div>
+      </SidebarInset>
+    </>
   );
 }

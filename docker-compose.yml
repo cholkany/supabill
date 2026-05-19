@@ -8,18 +8,19 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-      args:
-        - NEXT_PUBLIC_SERVER_URL=http://localhost:3001
     container_name: supabill-web
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_SERVER_URL=http://localhost:3001
-      - INTERNAL_SERVER_URL=http://server:3000
+      # INTERNAL_SERVER_URL: used by middleware at request time to proxy /api/auth/* to the server.
+      # Must use the Docker service name so container-to-container traffic works.
+      - INTERNAL_SERVER_URL=http://wireguard:3000
     restart: unless-stopped
     depends_on:
       - server
+      - wireguard
     networks:
       - supabill-network
 
@@ -28,18 +29,57 @@ services:
       context: .
       dockerfile: apps/server/Dockerfile
     container_name: supabill-server
-    ports:
-      - "3001:3000"
+    network_mode: "service:wireguard"
+    cap_add:
+      - NET_ADMIN
     environment:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_URL=postgresql://postgres:password@db:5432/supabill
       - BETTER_AUTH_SECRET=supabill-secret-key-development-12345
-      - BETTER_AUTH_URL=http://localhost:3001
+      - BETTER_AUTH_URL=http://localhost:3000
       - CORS_ORIGIN=http://localhost:3000
+      # ── Production: set these two to your server's public IP or hostname ──
+      # SERVER_PUBLIC_URL: base URL embedded in the router's provision script.
+      #   The MikroTik fetches this URL — must be reachable from the router's network.
+      #   Example: https://your-ngrok-url.ngrok-free.app  or  http://203.0.113.1:3000
+      - SERVER_PUBLIC_URL=https://1957-41-79-122-229.ngrok-free.app
+      #
+      # WG_PUBLIC_HOST: public IP/hostname the MikroTik dials for WireGuard.
+      #   Must be reachable on UDP port 51820 from the router's network.
+      #   Same host as SERVER_PUBLIC_URL but without scheme/port.
+      - WG_PUBLIC_HOST=1957-41-79-122-229.ngrok-free.app
+      - WG_LISTEN_PORT=51820
+      # Path inside the server container where peer configs are written (also mounted in wireguard container)
+      - WG_CONFS_DIR=/wireguard/wg_confs
+      # Optional: set to 1 to enable /api/debug/wireguard even in production
+      # - DEBUG_WIREGUARD=1
+    volumes:
+      - ./wireguard:/wireguard # Shared with wireguard container so server can write peer configs
     restart: unless-stopped
     depends_on:
       - db
+      - wireguard
+
+  wireguard:
+    image: lscr.io/linuxserver/wireguard:latest
+    container_name: supabill-wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./wireguard:/config
+      - /lib/modules:/lib/modules
+    ports:
+      - "51820:51820/udp"
+      - "3001:3000" # Expose the server's API port through wireguard container
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
     networks:
       - supabill-network
 
@@ -55,7 +95,7 @@ services:
     volumes:
       - supabill_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
