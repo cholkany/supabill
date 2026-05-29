@@ -1,6 +1,7 @@
 # Dockerfile for supabill Next.js app (monorepo compatible)
 
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
+
 
 # -------------------------
 # Build stage
@@ -9,7 +10,7 @@ FROM base AS builder
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.12.1 --activate
 
 # Copy lockfile and fetch dependencies (cache layer)
 COPY pnpm-lock.yaml ./
