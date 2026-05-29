@@ -24,7 +24,7 @@ COPY apps ./apps
 COPY packages ./packages
 
 # Install all deps offline
-RUN pnpm install --frozen-lockfile --offline
+RUN pnpm install --frozen-lockfile
 
 # Disable telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
