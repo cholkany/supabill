@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { useTheme } from "next-themes"
 import { Sun, Moon } from "lucide-react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -20,6 +21,11 @@ export function NavBar({
     title: string
 }) {
     const { theme, setTheme } = useTheme()
+    const [mounted, setMounted] = React.useState(false)
+
+    React.useEffect(() => {
+        setMounted(true)
+    }, [])
 
     return (
         <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
@@ -50,7 +56,7 @@ export function NavBar({
                     onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                     aria-label="Toggle theme"
                 >
-                    {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                    {mounted && (theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />)}
                 </Button>
             </div>
         </header>
