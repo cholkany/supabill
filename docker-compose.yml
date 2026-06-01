@@ -9,8 +9,10 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
     container_name: supabill-web
-    ports:
-      - "3000:3000"
+    # Expose to the compose network only (Dokploy/Traefik routes by container port 3000).
+    # For local browser access, add: ports: ["3000:3000"]
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_SERVER_URL=http://localhost:3001
