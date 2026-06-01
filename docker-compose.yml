@@ -18,11 +18,10 @@ services:
       - NEXT_PUBLIC_SERVER_URL=http://localhost:3001
       # INTERNAL_SERVER_URL: used by middleware at request time to proxy /api/auth/* to the server.
       # Must use the Docker service name so container-to-container traffic works.
-      - INTERNAL_SERVER_URL=http://wireguard:3000
+      - INTERNAL_SERVER_URL=http://server:3000
     restart: unless-stopped
     depends_on:
       - server
-      - wireguard
     networks:
       - supabill-network
 
@@ -31,9 +30,13 @@ services:
       context: .
       dockerfile: apps/server/Dockerfile
     container_name: supabill-server
-    network_mode: "service:wireguard"
     cap_add:
       - NET_ADMIN
+    expose:
+      - "3000"
+    # For local API access, add: ports: ["3001:3000"]
+    networks:
+      - supabill-network
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -78,7 +81,6 @@ services:
       - /lib/modules:/lib/modules
     ports:
       - "51820:51820/udp"
-      - "3001:3000" # Expose the server's API port through wireguard container
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
     restart: unless-stopped
