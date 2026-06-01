@@ -11,6 +11,11 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
+type SubmitButtonState = {
+  canSubmit: boolean;
+  isSubmitting: boolean;
+};
+
 export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
   const router = useRouter();
   const { isPending } = authClient.useSession();
@@ -133,18 +138,18 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
         </div>
 
         <form.Subscribe
-          selector={(state) => ({
+          selector={(state: SubmitButtonState): SubmitButtonState => ({
             canSubmit: state.canSubmit,
             isSubmitting: state.isSubmitting,
           })}
         >
-          {({ canSubmit, isSubmitting }) => (
+          {(state: SubmitButtonState) => (
             <Button
               type="submit"
               className="w-full"
-              disabled={!canSubmit || isSubmitting}
+              disabled={!state.canSubmit || state.isSubmitting}
             >
-              {isSubmitting ? "Submitting..." : "Sign Up"}
+              {state.isSubmitting ? "Submitting..." : "Sign Up"}
             </Button>
           )}
         </form.Subscribe>
