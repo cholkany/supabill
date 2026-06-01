@@ -2,8 +2,7 @@
 // https://tailwindcss.com/docs/font-family
 import type { Metadata } from "next";
 import { Geist, Noto_Serif_Georgian, Geist_Mono } from "next/font/google";
-import { ThemeProvider } from "@/providers/theme-provider"
-import { TooltipProvider } from "@/components/ui/tooltip";
+import Providers from "@/components/providers";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import './globals.css'
 
@@ -35,13 +34,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${fontSans.variable} ${fontSerif.variable} ${fontMono.variable} antialiased`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          <TooltipProvider>
-            <SidebarProvider>
-              {children}
-            </SidebarProvider>
-          </TooltipProvider>
-        </ThemeProvider>
+        <Providers>
+          <SidebarProvider>
+            {children}
+          </SidebarProvider>
+        </Providers>
       </body>
     </html>
   );
