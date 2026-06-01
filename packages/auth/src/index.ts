@@ -1,6 +1,6 @@
 import { db } from "@supabill/db";
 import * as schema from "@supabill/db/schema/auth";
-import { env } from "@supabill/env/server";
+import { env, getTrustedOrigins } from "@supabill/env/server";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
@@ -15,7 +15,7 @@ export const auth = betterAuth({
 
     schema: schema,
   }),
-  trustedOrigins: [env.CORS_ORIGIN],
+  trustedOrigins: getTrustedOrigins(),
   emailAndPassword: {
     enabled: true,
   },

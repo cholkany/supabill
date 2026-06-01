@@ -1,5 +1,5 @@
 import { auth } from "@supabill/auth";
-import { env } from "@supabill/env/server";
+import { env, getTrustedOrigins } from "@supabill/env/server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -55,7 +55,7 @@ app.use(logger());
 app.use(
   "/*",
   cors({
-    origin: env.CORS_ORIGIN,
+    origin: getTrustedOrigins(),
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "Cookie"],
     credentials: true,

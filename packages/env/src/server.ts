@@ -8,6 +8,8 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.url(),
     CORS_ORIGIN: z.url(),
+    /** Comma-separated extra allowed origins (e.g. http://localhost:3000 in production). */
+    TRUSTED_ORIGINS: z.string().optional(),
     ROUTER_CREDENTIALS_KEY: z.string().min(32).optional(),
     // Publicly reachable base URL (DNS name) used in the RouterOS provision script.
     // e.g. https://api.yourdomain.com  — must be reachable by the MikroTik router.
@@ -26,3 +28,15 @@ export const env = createEnv({
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,
 });
+
+/** Origins allowed for Better Auth and Hono CORS (primary + optional extras). */
+export function getTrustedOrigins(): string[] {
+  const origins = new Set<string>([env.CORS_ORIGIN]);
+  if (env.TRUSTED_ORIGINS) {
+    for (const part of env.TRUSTED_ORIGINS.split(",")) {
+      const trimmed = part.trim();
+      if (trimmed) origins.add(trimmed);
+    }
+  }
+  return [...origins];
+}

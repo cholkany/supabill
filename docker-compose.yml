@@ -42,8 +42,11 @@ services:
       - PORT=3000
       - DATABASE_URL=postgresql://postgres:password@db:5432/supabill
       - BETTER_AUTH_SECRET=supabill-secret-key-development-12345
-      - BETTER_AUTH_URL=http://localhost:3000
-      - CORS_ORIGIN=http://localhost:3000
+      # Public URL users open in the browser (web app + /api/auth proxy). Set APP_URL in Dokploy.
+      - BETTER_AUTH_URL=${APP_URL:-http://localhost:3000}
+      - CORS_ORIGIN=${APP_URL:-http://localhost:3000}
+      # Optional: comma-separated extra origins, e.g. http://localhost:3000
+      - TRUSTED_ORIGINS=${TRUSTED_ORIGINS:-}
       # ── Production: set these two to your server's public IP or hostname ──
       # SERVER_PUBLIC_URL: base URL embedded in the router's provision script.
       #   The MikroTik fetches this URL — must be reachable from the router's network.

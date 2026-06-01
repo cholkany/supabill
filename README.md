@@ -40,8 +40,10 @@ Supabill is a MikroTik billing platform inspired by Mikhmon, rebuilt as a multit
 2. Configure your environment variables for the server and web apps:
    - `DATABASE_URL`
    - `BETTER_AUTH_SECRET`
-   - `BETTER_AUTH_URL`
-   - `CORS_ORIGIN`
+   - `BETTER_AUTH_URL` — public app URL (same origin users use in the browser)
+   - `CORS_ORIGIN` — usually the same as `BETTER_AUTH_URL`
+   - `TRUSTED_ORIGINS` (optional) — comma-separated extra origins
+   - `APP_URL` (Docker/Dokploy) — sets both `BETTER_AUTH_URL` and `CORS_ORIGIN`
    - `ROUTER_CREDENTIALS_KEY` (min 32 chars, for encrypted router API credentials at rest)
    - `ROUTER_PROVISION_BASE_URL` (optional public base URL used in generated provision scripts)
    - `ROUTER_API_TIMEOUT_MS` (optional, defaults to `7000`)
@@ -53,6 +55,7 @@ The web app runs on [http://localhost:3001](http://localhost:3001) and the API r
 
 ## Notes for production
 
+- Set `APP_URL` (or `BETTER_AUTH_URL` + `CORS_ORIGIN`) to your public HTTPS origin, e.g. `https://your-app.example.com`. Better Auth rejects sign-in/sign-up if the browser origin is not listed.
 - Ensure your Supabill API is reachable from physical routers for the `/provision/:provisionToken` flow
 - Router setup and dashboard endpoints now require authenticated Better Auth sessions (cookie-based), not user ID headers
 - Restrict inbound provisioning and API access with firewall rules and TLS termination
