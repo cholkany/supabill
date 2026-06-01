@@ -25,6 +25,22 @@ services:
     networks:
       - supabill-network
 
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+      target: builder
+    container_name: supabill-migrate
+    environment:
+      DATABASE_URL: postgresql://postgres:password@db:5432/supabill
+    command: ["sh", "-c", "pnpm --filter @supabill/db db:push"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - supabill-network
+    restart: "no"
+
   server:
     build:
       context: .
@@ -66,8 +82,12 @@ services:
       - ./wireguard:/wireguard # Shared with wireguard container so server can write peer configs
     restart: unless-stopped
     depends_on:
-      - db
-      - wireguard
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      wireguard:
+        condition: service_started
 
   wireguard:
     image: lscr.io/linuxserver/wireguard:latest

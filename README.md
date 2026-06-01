@@ -48,7 +48,7 @@ Supabill is a MikroTik billing platform inspired by Mikhmon, rebuilt as a multit
    - `ROUTER_PROVISION_BASE_URL` (optional public base URL used in generated provision scripts)
    - `ROUTER_API_TIMEOUT_MS` (optional, defaults to `7000`)
 3. Start PostgreSQL or use the included database compose setup
-4. Push the schema with `pnpm run db:push`
+4. Push the schema with `pnpm run db:push` (Docker Compose runs this automatically via the `migrate` service before the API starts)
 5. Start the workspace with `pnpm run dev`
 
 The web app runs on [http://localhost:3001](http://localhost:3001) and the API runs on [http://localhost:3000](http://localhost:3000).
@@ -56,6 +56,7 @@ The web app runs on [http://localhost:3001](http://localhost:3001) and the API r
 ## Notes for production
 
 - Set `APP_URL` (or `BETTER_AUTH_URL` + `CORS_ORIGIN`) to your public HTTPS origin, e.g. `https://your-app.example.com`. Better Auth rejects sign-in/sign-up if the browser origin is not listed.
+- On first deploy, ensure database tables exist. Compose runs `db:push` in the `migrate` container; if you see `relation "user" does not exist`, redeploy or run `pnpm run db:push` with `DATABASE_URL` pointing at your Postgres instance.
 - Ensure your Supabill API is reachable from physical routers for the `/provision/:provisionToken` flow
 - Router setup and dashboard endpoints now require authenticated Better Auth sessions (cookie-based), not user ID headers
 - Restrict inbound provisioning and API access with firewall rules and TLS termination
