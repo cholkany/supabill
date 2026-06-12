@@ -55,3 +55,19 @@ export const managedRouterWireguardRelations = relations(managedRouterWireguard,
     references: [managedRouter.id],
   }),
 }));
+
+export const wireguardHub = pgTable("wireguard_hub", {
+  id: text("id").primaryKey(),
+
+  publicKey: text("public_key").notNull(),
+
+  privateKeyEncrypted: text("private_key_encrypted").notNull(),
+
+  endpoint: text("endpoint").notNull(),
+
+  listenPort: integer("listen_port").notNull(),
+
+  createdAt: timestamp("created_at")
+    .defaultNow()
+    .notNull(),
+});

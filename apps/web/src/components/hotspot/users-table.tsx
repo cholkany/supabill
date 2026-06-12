@@ -165,6 +165,9 @@ const HotspotUsersTable = ({ users }: { users: RouterDashboardData['hotspotUsers
                     <td className="p-4">
                       <span className="text-sm font-medium text-foreground text-nowrap">{user.uptime}</span>
                     </td>
+                    <td className="p-4">
+                      <span className="text-sm text-muted-foreground text-nowrap">{user.ipAddress}</span>
+                    </td>
                     <td className="p-4 text-center">
                       {user.status === "online" ? (
                         <Badge variant="outline" className="px-2.5 py-0.5 font-semibold bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-800">
@@ -177,7 +180,7 @@ const HotspotUsersTable = ({ users }: { users: RouterDashboardData['hotspotUsers
                       )}
                     </td>
                     <td className="p-4">
-                      <span className="text-sm text-muted-foreground text-nowrap">{user.uptime}</span>
+                      <span className="text-sm text-muted-foreground text-nowrap">{user.ipAddress}</span>
                     </td>
                     <td className="p-4">
                       <DropdownMenu>

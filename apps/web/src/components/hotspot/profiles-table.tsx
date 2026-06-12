@@ -79,6 +79,7 @@ export function HotspotProfilesTable({ profiles }: { profiles: RouterDashboardDa
   
   return (
     <div className="flex flex-col gap-6 w-full">
+        
       <div className="overflow-x-auto rounded-lg border w-full">
         <Table>
           <TableHeader>

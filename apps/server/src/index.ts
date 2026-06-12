@@ -24,6 +24,11 @@ import {
 import { exec as execCb } from "node:child_process";
 import { promisify } from "node:util";
 
+import { initializeJobs } from "./lib/jobs/index.js";
+import { routerHeartbeatRoute } from "./routes/router-heartbeat.js";
+import { routerBootstrapRoute } from "./routes/router-bootstrap.js";
+import { routerRegisterRoute } from "./routes/router-register.js";
+
 // node-routeros@1.6.9 throws synchronously from TCP socket event handlers when
 // RouterOS returns an "!empty" word (library bug: treats it as an unknown reply).
 // Because throws inside EventEmitter callbacks bypass all promise try-catch, the
@@ -50,6 +55,7 @@ const exec = promisify(execCb);
 // Best-effort: if a WG config already exists on disk, bring the interface up.
 // This makes `docker compose up` testable without first provisioning a router.
 void ensureWireguardInterfaceUpFromDisk();
+void initializeJobs();
 
 app.use(logger());
 app.use(
@@ -62,6 +68,10 @@ app.use(
   }),
 );
 
+// Register custom Hono sub-routers
+app.route("/router/heartbeat", routerHeartbeatRoute);
+app.route("/bootstrap", routerBootstrapRoute);
+app.route("/router/register", routerRegisterRoute);
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 

@@ -24,6 +24,8 @@ export const env = createEnv({
     MIKROTIK_LAN_IP: z.string().optional(),
     MIKROTIK_USERNAME: z.string().optional(),
     MIKROTIK_PASSWORD: z.string().optional(),
+    WG_SERVER_PRIVATE_KEY: z.string(),
+    WG_SERVER_PUBLIC_KEY: z.string(),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,

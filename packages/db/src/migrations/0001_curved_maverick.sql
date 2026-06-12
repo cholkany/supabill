@@ -1,0 +1,1 @@
+ALTER TABLE "managed_router" ADD COLUMN "router_os_version" text;

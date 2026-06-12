@@ -13,6 +13,7 @@ import { env } from "@supabill/env/server";
 import { decryptSecret, encryptSecret, generateRouterPassword } from "./router-crypto.js";
 import { applyRouterHotspotSetup, getRouterLiveSnapshot, probeRouter } from "./routeros-probe.js";
 import { provisionWireguard } from "./wireguard.js";
+import { generateClaimCode } from "./router/claim-code.js";
 
 type SetupStatus = (typeof managedRouterSetup.$inferSelect)["status"];
 type RouterStatus = (typeof managedRouterStatusEnum.enumValues)[number];
@@ -183,7 +184,7 @@ async function runBackgroundProvision({
     await db
       .update(managedRouter)
       .set({
-        status: "online",
+        status: "ready",
         lastError: null,
         lastSeenAt: new Date(),
         updatedAt: new Date(),
@@ -195,7 +196,7 @@ async function runBackgroundProvision({
     await db
       .update(managedRouter)
       .set({
-        status: "warning",
+        status: "error",
         lastError: message,
         updatedAt: new Date(),
       })
@@ -272,7 +273,8 @@ export async function startRouterSetup({
     apiPort: 8728,
     apiUsername,
     apiPasswordEncrypted: encryptSecret(apiPassword),
-    status: "warning",
+    status: "pending",
+    claimCode: generateClaimCode(),
     wanPort: "ether1",
     hotspotPorts: [],
     timezone: "Africa/Juba",
@@ -307,6 +309,18 @@ export async function getSetupById(setupId: string, userId: string) {
     return null;
   }
 
+  let claimCode: string | null = null;
+  let routerStatus: string | null = null;
+  if (setup.completedRouterId) {
+    const r = await db.query.managedRouter.findFirst({
+      where: eq(managedRouter.id, setup.completedRouterId),
+    });
+    if (r) {
+      claimCode = r.claimCode;
+      routerStatus = r.status;
+    }
+  }
+
   return {
     setupId: setup.id,
     step: toStep(setup.status),
@@ -322,6 +336,8 @@ export async function getSetupById(setupId: string, userId: string) {
     selectedHotspotPorts: setup.selectedHotspotPorts,
     completedRouterId: setup.completedRouterId,
     setupLogs: setup.setupLogs,
+    claimCode,
+    routerStatus,
   };
 }
 
@@ -510,7 +526,8 @@ export async function completeSetup({
       apiPort: setup.apiPort,
       apiUsername: setup.apiUsername,
       apiPasswordEncrypted: setup.apiPasswordEncrypted,
-      status: "warning",
+      status: "pending",
+      claimCode: generateClaimCode(),
       wanPort: "ether1",
       hotspotPorts: normalized,
       timezone: "Africa/Juba",
@@ -597,7 +614,7 @@ export async function getRouterDashboard({
     await db
       .update(managedRouter)
       .set({
-        status: "online",
+        status: "ready",
         lastSeenAt: new Date(),
         lastProbeAt: new Date(),
         lastError: null,
@@ -609,7 +626,7 @@ export async function getRouterDashboard({
     await db
       .update(managedRouter)
       .set({
-        status: "warning",
+        status: "error",
         lastProbeAt: new Date(),
         lastError: message,
         updatedAt: new Date(),

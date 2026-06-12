@@ -4,7 +4,7 @@ export type RouterListItem = {
   id: string;
   name: string;
   location: string;
-  status: "online" | "warning" | "offline";
+  status: "pending" | "bootstrap_generated" | "connecting" | "connected" | "syncing" | "ready" | "error";
   wanPort: string;
   hotspotPorts: string[];
   createdAt: string;
@@ -37,13 +37,15 @@ export type RouterSetupState = {
   selectedHotspotPorts: string[];
   completedRouterId: string | null;
   setupLogs: string[];
+  claimCode: string | null;
+  routerStatus: string | null;
 };
 
 export type RouterDashboardData = {
   id: string;
   name: string;
   location: string;
-  status: "online" | "warning" | "offline";
+  status: "pending" | "bootstrap_generated" | "connecting" | "connected" | "syncing" | "ready" | "error";
   wanPort: string;
   hotspotPorts: string[];
   createdAt: string;

@@ -4,8 +4,9 @@ import dotenv from "dotenv";
 import { defineConfig } from "drizzle-kit";
 
 const localEnv = resolve(process.cwd(), "../../apps/server/.env");
-
-import { defineConfig } from "drizzle-kit";
+if (existsSync(localEnv)) {
+  dotenv.config({ path: localEnv });
+}
 
 export default defineConfig({
   schema: "./src/schema",

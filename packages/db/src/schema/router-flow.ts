@@ -11,7 +11,15 @@ export const routerSetupStatusEnum = pgEnum("router_setup_status", [
   "failed",
 ]);
 
-export const managedRouterStatusEnum = pgEnum("managed_router_status", ["online", "warning", "offline"]);
+export const managedRouterStatusEnum = pgEnum("managed_router_status", [
+  "pending",
+  "bootstrap_generated",
+  "connecting",
+  "connected",
+  "syncing",
+  "ready",
+  "error",
+]);
 export const managedRouterLogLevelEnum = pgEnum("managed_router_log_level", ["info", "warning", "error"]);
 
 export const managedRouterSetup = pgTable(
@@ -21,9 +29,13 @@ export const managedRouterSetup = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+
+      // ── Router details ────────────────────────────────────────────────────
     routerName: text("router_name").notNull(),
     location: text("location").notNull(),
     status: routerSetupStatusEnum("status").default("provision_script_generated").notNull(),
+
+    // ── Provisioning details ──────────────────────────────────────────────
     step: integer("step").default(2).notNull(),
     provisionToken: text("provision_token").notNull().unique(),
     provisionUrl: text("provision_url").notNull(),
@@ -39,6 +51,12 @@ export const managedRouterSetup = pgTable(
     selectedHotspotPorts: jsonb("selected_hotspot_ports").$type<string[]>().default([]).notNull(),
     setupLogs: jsonb("setup_logs").$type<string[]>().default([]).notNull(),
     completedRouterId: text("completed_router_id"),
+    // ── Heartbeat details ──────────────────────────────────────────────────
+    lastHeartbeatAt: timestamp("last_heartbeat_at"),
+    cpuLoadPercent: integer("cpu_load_percent"),
+    memoryUsagePercent: integer("memory_usage_percent"),
+    routerOsVersion: text("router_os_version"),
+    // ── Timestamps ──────────────────────────────────────────────────────────
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -65,13 +83,25 @@ export const managedRouter = pgTable(
     apiPort: integer("api_port").default(8728).notNull(),
     apiUsername: text("api_username").notNull(),
     apiPasswordEncrypted: text("api_password_encrypted").notNull(),
-    status: managedRouterStatusEnum("status").default("online").notNull(),
+    status: managedRouterStatusEnum("status").default("pending").notNull(),
     wanPort: text("wan_port").default("ether1").notNull(),
     hotspotPorts: jsonb("hotspot_ports").$type<string[]>().default([]).notNull(),
     alertingEnabled: boolean("alerting_enabled").default(true).notNull(),
     timezone: text("timezone").default("Africa/Juba").notNull(),
     dnsServers: jsonb("dns_servers").$type<string[]>().default(["1.1.1.1", "8.8.8.8"]).notNull(),
     ntpServers: jsonb("ntp_servers").$type<string[]>().default(["pool.ntp.org"]).notNull(),
+    
+    // Onboarding / Zero-Touch / Heartbeat
+    claimCode: text("claim_code").unique(),
+    lastHeartbeatAt: timestamp("last_heartbeat_at"),
+    tunnelIp: text("tunnel_ip"),
+    cpuLoadPercent: integer("cpu_load_percent"),
+    memoryUsagePercent: integer("memory_usage_percent"),
+    serialNumber: text("serial_number"),
+    architecture: text("architecture"),
+    routerIdentity: text("router_identity"),
+    routerOsVersion: text("router_os_version"),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

@@ -35,9 +35,11 @@ export default async function RouterHotspotProfilesPage({
               Create New Profile
             </Button>
           </div>
-            <HotspotProfilesTable profiles={router.hotspotProfiles} />
+          <HotspotProfilesTable profiles={router.hotspotProfiles} />
         </div>
       </SidebarInset>
     </>
   );
 }
+
+

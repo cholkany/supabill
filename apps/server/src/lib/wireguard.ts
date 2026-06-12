@@ -9,6 +9,8 @@ import { env } from "@supabill/env/server";
 
 import { decryptSecret, encryptSecret } from "./router-crypto.js";
 import { probeRouter } from "./routeros-probe.js";
+import { getWireguardServerConfig } from "./wireguard-server.js";
+import { allocateRouterTunnelIp } from "./wg-ipam.js";
 
 const SUPABILL_WG_IFACE = "supabill-wg";
 const LEGACY_WG_IFACE = "supabill";
@@ -70,23 +72,6 @@ function generateWireguardKeypair(): { privateKey: string; publicKey: string } {
   };
 }
 
-// Allocate a /30 tunnel subnet. Supabill gets .1, MikroTik gets .2.
-async function allocateTunnelSubnet(): Promise<{ serverIp: string; routerIp: string }> {
-  const existing = await db.select({ routerIp: managedRouterWireguard.peerTunnelIp }).from(managedRouterWireguard);
-  const used = new Set(existing.map((r) => r.routerIp));
-
-  for (let n = 1; n <= 254; n++) {
-    const routerIp = `10.100.${n}.2/30`; // MikroTik's tunnel address
-    if (!used.has(routerIp)) {
-      return {
-        serverIp: `10.100.${n}.1/30`, // Supabill's tunnel address
-        routerIp,
-      };
-    }
-  }
-  throw new Error("No available WireGuard subnets");
-}
-
 // ── RouterOS script generation ──────────────────────────────────────────────
 // Architecture: Supabill = WG server (listens). MikroTik = WG client (dials out).
 
@@ -126,19 +111,15 @@ async function syncServerWireguardConf(): Promise<void> {
 
   // Fetch all WG records to rebuild the full conf
   const allWg = await db.select().from(managedRouterWireguard);
-  if (allWg.length === 0) return;
 
-  // Use the first record's server-side key as the interface key
-  // In practice all records share the same Supabill server keys — use the first.
-  const first = allWg[0]!;
-  const serverPrivateKey = decryptSecret(first.peerPrivateKeyEncrypted);
+  const serverConfig = getWireguardServerConfig();
+  const serverPrivateKey = serverConfig.privateKey;
 
   const ifaceSection = [
     "[Interface]",
     `PrivateKey = ${serverPrivateKey}`,
-    // routerTunnelIp in DB is now Supabill's tunnel address (see allocateTunnelSubnet)
-    `Address = ${first.routerTunnelIp}`,
-    `ListenPort = ${env.WG_LISTEN_PORT}`,
+    `Address = 10.100.0.1/16`,
+    `ListenPort = ${serverConfig.listenPort}`,
   ].join("\n");
 
   const peerSections = allWg.map((wg) => {
@@ -312,42 +293,34 @@ export async function probeWireguardAndRouter(routerId: string, userId: string) 
   };
 }
 
-// ── High-level provisioning ──────────────────────────────────────────────────
-
-export async function provisionWireguard(routerId: string, userId: string) {
+export async function provisionWireguard(routerId: string, userId: string, serverHostname?: string) {
   const router = await db.query.managedRouter.findFirst({
     where: and(eq(managedRouter.id, routerId), eq(managedRouter.userId, userId)),
   });
   if (!router) return { error: "Router not found." };
 
   // routerKeys  = MikroTik's keypair  (private stays on MikroTik via script)
-  // serverKeys  = Supabill's keypair  (private stays in DB, public goes to MikroTik)
+  // serverKeys  = Supabill's keypair  (private stays in DB / env, public goes to MikroTik)
   const routerKeys = generateWireguardKeypair();
-  const serverKeys = generateWireguardKeypair();
-  const { serverIp, routerIp } = await allocateTunnelSubnet();
+  const serverKeys = getWireguardServerConfig();
+  const routerIp = await allocateRouterTunnelIp();
+  const serverIp = "10.100.0.1/32";
 
   const wgId = crypto.randomUUID();
   const existing = await db.query.managedRouterWireguard.findFirst({
     where: eq(managedRouterWireguard.routerId, routerId),
   });
 
-  // DB field mapping after architecture flip:
-  //   routerTunnelIp         → Supabill's tunnel address (server side)
-  //   peerTunnelIp           → MikroTik's tunnel address (client/peer side)
-  //   routerPrivateKeyEnc    → MikroTik's private key (sent to MikroTik via script)
-  //   routerPublicKey        → MikroTik's public key  (Supabill registers as peer)
-  //   peerPrivateKeyEnc      → Supabill's private key (stays in DB / server conf)
-  //   peerPublicKey          → Supabill's public key  (sent to MikroTik via script)
   const record = {
     routerInterfaceName: SUPABILL_WG_IFACE,
-    routerListenPort: env.WG_LISTEN_PORT,
+    routerListenPort: serverKeys.listenPort,
     routerPrivateKeyEncrypted: encryptSecret(routerKeys.privateKey),
     routerPublicKey: routerKeys.publicKey,
-    routerTunnelIp: serverIp,   // Supabill's tunnel IP  e.g. 10.100.1.1/30
+    routerTunnelIp: serverIp,   // Supabill's tunnel IP  e.g. 10.100.0.1/32
     peerPrivateKeyEncrypted: encryptSecret(serverKeys.privateKey),
     peerPublicKey: serverKeys.publicKey,
-    peerTunnelIp: routerIp,     // MikroTik's tunnel IP  e.g. 10.100.1.2/30
-    wanHost: normalizePublicHost(env.WG_PUBLIC_HOST) ?? null,
+    peerTunnelIp: routerIp + "/32",     // MikroTik's tunnel IP  e.g. 10.100.0.2/32
+    wanHost: serverHostname || normalizePublicHost(env.WG_PUBLIC_HOST) || null,
     status: "pending" as const,
     lastError: null,
     updatedAt: new Date(),
@@ -369,7 +342,6 @@ export async function provisionWireguard(routerId: string, userId: string) {
 
   return { success: true };
 }
-
 // ── Script generator (called from provision endpoint) ───────────────────────
 
 export async function getWireguardScriptForRouter(routerId: string): Promise<string | null> {
