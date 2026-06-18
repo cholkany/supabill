@@ -25,24 +25,28 @@ services:
     networks:
       - supabill-network
 
-  migrate:
-    build:
-      context: .
-      dockerfile: apps/server/Dockerfile
-      target: builder
-    container_name: supabill-migrate
-    environment:
-      DATABASE_URL: postgresql://postgres:password@db:5432/supabill
+migrate:
+  build:
+    context: .
+    dockerfile: apps/server/Dockerfile
+    target: builder
 
-    command: ["sh", "-c", "pnpm --filter @supabill/db db:migrate"]
+  container_name: supabill-migrate
 
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - supabill-network
-    restart: "no"
+  environment:
+    DATABASE_URL: postgresql://postgres:password@db:5432/supabill
 
+  command: ["sh", "-c", "pnpm --filter @supabill/db db:migrate"]
+
+  depends_on:
+    db:
+      condition: service_healthy
+
+  networks:
+    - supabill-network
+
+  restart: "no"
+  
   server:
     build:
       context: .
