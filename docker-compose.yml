@@ -33,7 +33,7 @@ services:
     container_name: supabill-migrate
     environment:
       DATABASE_URL: postgresql://postgres:password@db:5432/supabill
-    command: ["sh", "-c", "pnpm --filter @supabill/db db:migrate --verbose"]
+    command: ["sh", "-c", "pnpm --filter @supabill/db db:push"]
     depends_on:
       db:
         condition: service_healthy
