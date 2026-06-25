@@ -64,6 +64,46 @@ try {
       );
     `);
 
+    // Sync missing columns for managed_router and managed_router_setup
+    console.log("Syncing missing columns for managed_router and managed_router_setup...");
+    try {
+      await client.query(`
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "claim_code" text;
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "last_heartbeat_at" timestamp;
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "tunnel_ip" text;
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "cpu_load_percent" integer;
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "memory_usage_percent" integer;
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "serial_number" text;
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "architecture" text;
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "router_identity" text;
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "router_os_version" text;
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "last_seen_at" timestamp DEFAULT now();
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "last_probe_at" timestamp;
+        ALTER TABLE "managed_router" ADD COLUMN IF NOT EXISTS "last_error" text;
+      `);
+      
+      try {
+        await client.query(`
+          ALTER TABLE "managed_router" ADD CONSTRAINT "managed_router_claim_code_unique" UNIQUE("claim_code");
+        `);
+      } catch (e) {
+        // Ignore if constraint already exists or there is duplicate data
+      }
+    } catch (e) {
+      console.warn("Failed to sync managed_router columns:", e.message);
+    }
+
+    try {
+      await client.query(`
+        ALTER TABLE "managed_router_setup" ADD COLUMN IF NOT EXISTS "last_heartbeat_at" timestamp;
+        ALTER TABLE "managed_router_setup" ADD COLUMN IF NOT EXISTS "cpu_load_percent" integer;
+        ALTER TABLE "managed_router_setup" ADD COLUMN IF NOT EXISTS "memory_usage_percent" integer;
+        ALTER TABLE "managed_router_setup" ADD COLUMN IF NOT EXISTS "router_os_version" text;
+      `);
+    } catch (e) {
+      console.warn("Failed to sync managed_router_setup columns:", e.message);
+    }
+
     // Read first migration file (0000_sticky_silverclaw.sql)
     const firstMigrationPath = resolve(__dirname, "./src/migrations/0000_sticky_silverclaw.sql");
     if (existsSync(firstMigrationPath)) {
