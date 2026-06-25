@@ -7,9 +7,18 @@ if (!env.DATABASE_URL) {
   );
 }
 
+const dbUrl = env.DATABASE_URL;
+const requiresSsl =
+  dbUrl.includes("sslmode=") ||
+  dbUrl.includes("ssl=true") ||
+  (!dbUrl.includes("localhost") &&
+    !dbUrl.includes("127.0.0.1") &&
+    !dbUrl.includes("@db:"));
+
 export const boss = new PgBoss({
   connectionString: env.DATABASE_URL,
   max: 10,
+  ssl: requiresSsl ? { rejectUnauthorized: false } : undefined,
 });
 
 boss.on("error", (error) => {
