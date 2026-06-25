@@ -240,8 +240,10 @@ export async function startRouterSetup({
   const provisionUrl = `${getProvisionBaseUrl(serverBaseUrl)}/provision/${provisionToken}`;
   const apiUsername = generateApiUsername(setupId);
   const apiPassword = generateRouterPassword(26);
+  const isNgrok = provisionUrl.includes("ngrok-free.app") || provisionUrl.includes("ngrok.io");
+  const headers = isNgrok ? ' http-header-field="ngrok-skip-browser-warning:true"' : "";
   const provisionScript = [
-    `/tool fetch mode=http url="${provisionUrl}" http-header-field="ngrok-skip-browser-warning:true" dst-path=supabill-setup.rsc`,
+    `/tool fetch mode=http url="${provisionUrl}"${headers} dst-path=supabill-setup.rsc`,
     "/import file-name=supabill-setup.rsc",
   ].join("; ");
 
