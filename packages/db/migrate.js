@@ -38,6 +38,37 @@ const client = new pg.Client({
   ssl: requiresSsl ? { rejectUnauthorized: false } : undefined,
 });
 
+const enumsToSync = {
+  customer_status: ["active", "grace", "suspended", "offline"],
+  feature_status: ["planned", "active", "archived"],
+  invoice_status: ["draft", "open", "paid", "overdue"],
+  membership_role: ["owner", "admin", "finance", "support"],
+  payment_method: ["cash", "bank_transfer", "mobile_money", "card"],
+  wireguard_peer_status: ["connected", "pending", "revoked"],
+  router_role: ["core", "branch", "pop", "lab"],
+  router_status: ["online", "warning", "offline"],
+  service_type: ["hotspot", "pppoe", "static", "hybrid"],
+  tenant_status: ["active", "trial", "suspended"],
+  managed_router_log_level: ["info", "warning", "error"],
+  managed_router_status: [
+    "pending",
+    "bootstrap_generated",
+    "connecting",
+    "connected",
+    "syncing",
+    "ready",
+    "error",
+  ],
+  router_setup_status: [
+    "provision_script_generated",
+    "provision_fetched",
+    "reachable",
+    "completed",
+    "failed",
+  ],
+  wireguard_tunnel_status: ["pending", "applied", "error"],
+};
+
 try {
   await client.connect();
 
@@ -63,6 +94,18 @@ try {
         "created_at" bigint
       );
     `);
+
+    // Sync enum values
+    console.log("Syncing enum values...");
+    for (const [enumName, values] of Object.entries(enumsToSync)) {
+      for (const val of values) {
+        try {
+          await client.query(`ALTER TYPE "public"."${enumName}" ADD VALUE IF NOT EXISTS '${val}';`);
+        } catch (e) {
+          console.warn(`Failed to add value '${val}' to enum '${enumName}':`, e.message);
+        }
+      }
+    }
 
     // Sync missing columns for managed_router and managed_router_setup
     console.log("Syncing missing columns for managed_router and managed_router_setup...");
