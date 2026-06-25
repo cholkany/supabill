@@ -67,12 +67,12 @@ services:
       # SERVER_PUBLIC_URL: base URL embedded in the router's provision script.
       #   The MikroTik fetches this URL — must be reachable from the router's network.
       #   Example: https://your-ngrok-url.ngrok-free.app  or  http://203.0.113.1:3000
-      - SERVER_PUBLIC_URL=https://1957-41-79-122-229.ngrok-free.app
+      - SERVER_PUBLIC_URL=${SERVER_PUBLIC_URL:-https://1957-41-79-122-229.ngrok-free.app}
       #
       # WG_PUBLIC_HOST: public IP/hostname the MikroTik dials for WireGuard.
       #   Must be reachable on UDP port 51820 from the router's network.
       #   Same host as SERVER_PUBLIC_URL but without scheme/port.
-      - WG_PUBLIC_HOST=1957-41-79-122-229.ngrok-free.app
+      - WG_PUBLIC_HOST=${WG_PUBLIC_HOST:-1957-41-79-122-229.ngrok-free.app}
       - WG_LISTEN_PORT=51820
       # Path inside the server container where peer configs are written (also mounted in wireguard container)
       - WG_CONFS_DIR=/wireguard/wg_confs
