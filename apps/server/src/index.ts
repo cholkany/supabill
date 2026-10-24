@@ -1,4 +1,5 @@
 import { auth } from "@supabill/auth";
+import { ensurePersonalTenantForUser } from "@supabill/db/tenancy";
 import { env, getTrustedOrigins } from "@supabill/env/server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -76,22 +77,26 @@ app.route("/router/register", routerRegisterRoute);
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 async function requireAuthenticatedUser(c: { req: { raw: Request } }) {
+  let session: Awaited<ReturnType<typeof auth.api.getSession>>;
+
   try {
-    const session = await auth.api.getSession({
+    session = await auth.api.getSession({
       headers: c.req.raw.headers,
       query: {
         disableCookieCache: true,
       },
     });
-
-    if (!session?.user?.id) {
-      return null;
-    }
-
-    return session.user;
   } catch {
     return null;
   }
+
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  const tenantId = await ensurePersonalTenantForUser(session.user);
+
+  return { ...session.user, tenantId };
 }
 
 app.get("/api/platform/overview", async (c) => {
@@ -177,6 +182,7 @@ app.post("/api/routers/setup/start", async (c) => {
 
   const setup = await startRouterSetup({
     userId: user.id,
+    tenantId: user.tenantId,
     routerName,
     location,
     serverBaseUrl,
@@ -241,6 +247,7 @@ app.post("/api/routers/setup/:setupId/complete", async (c) => {
   const result = await completeSetup({
     setupId: c.req.param("setupId"),
     userId: user.id,
+    tenantId: user.tenantId,
     selectedHotspotPorts: Array.isArray(body.selectedHotspotPorts) ? body.selectedHotspotPorts : [],
   });
 

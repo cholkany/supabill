@@ -55,7 +55,8 @@ supabill/
 - `pnpm dev` - Start development server
 - `pnpm build` - Build for production
 - `pnpm test` - Run tests
-- `pnpm db:push` - Push database schema
+- `pnpm db:push` - Push database schema (fresh databases only)
+- `pnpm db:migrate` - Apply database migrations (existing databases)
 - `pnpm db:studio` - Open database UI
 
 ## Maintenance

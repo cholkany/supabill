@@ -15,6 +15,13 @@
       "when": 1781295258558,
       "tag": "0001_curved_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792323060826,
+      "tag": "0002_perfect_red_shift",
+      "breakpoints": true
     }
   ]
 }

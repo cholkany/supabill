@@ -226,11 +226,13 @@ export async function listRoutersForUser(userId: string) {
 
 export async function startRouterSetup({
   userId,
+  tenantId,
   routerName,
   location,
   serverBaseUrl,
 }: {
   userId: string;
+  tenantId: string;
   routerName: string;
   location: string;
   serverBaseUrl: string;
@@ -252,6 +254,7 @@ export async function startRouterSetup({
   await db.insert(managedRouterSetup).values({
     id: setupId,
     userId,
+    tenantId,
     routerName,
     location,
     status: "provision_script_generated",
@@ -268,6 +271,7 @@ export async function startRouterSetup({
   await db.insert(managedRouter).values({
     id: routerId,
     userId,
+    tenantId,
     setupId: setupId,
     name: routerName,
     location,
@@ -476,10 +480,12 @@ export async function testSetupConnectivity({
 export async function completeSetup({
   setupId,
   userId,
+  tenantId,
   selectedHotspotPorts,
 }: {
   setupId: string;
   userId: string;
+  tenantId: string;
   selectedHotspotPorts: string[];
 }) {
   const setup = await db.query.managedRouterSetup.findFirst({
@@ -521,6 +527,7 @@ export async function completeSetup({
     await db.insert(managedRouter).values({
       id: routerId,
       userId,
+      tenantId,
       setupId: setup.id,
       name: setup.routerName,
       location: setup.location,

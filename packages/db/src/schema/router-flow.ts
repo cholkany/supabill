@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { user } from "./auth.js";
+import { tenant } from "./platform.js";
 
 export const routerSetupStatusEnum = pgEnum("router_setup_status", [
   "provision_script_generated",
@@ -29,6 +30,9 @@ export const managedRouterSetup = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
 
       // ── Router details ────────────────────────────────────────────────────
     routerName: text("router_name").notNull(),
@@ -65,6 +69,7 @@ export const managedRouterSetup = pgTable(
   },
   (table) => [
     index("managed_router_setup_user_idx").on(table.userId),
+    index("managed_router_setup_tenant_idx").on(table.tenantId),
     index("managed_router_setup_token_idx").on(table.provisionToken),
   ],
 );
@@ -76,6 +81,9 @@ export const managedRouter = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenant.id, { onDelete: "cascade" }),
     setupId: text("setup_id").references(() => managedRouterSetup.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     location: text("location").notNull(),
@@ -113,6 +121,7 @@ export const managedRouter = pgTable(
   },
   (table) => [
     index("managed_router_user_idx").on(table.userId),
+    index("managed_router_tenant_idx").on(table.tenantId),
     index("managed_router_setup_idx").on(table.setupId),
   ],
 );
@@ -136,6 +145,10 @@ export const managedRouterSetupRelations = relations(managedRouterSetup, ({ one,
     fields: [managedRouterSetup.userId],
     references: [user.id],
   }),
+  tenant: one(tenant, {
+    fields: [managedRouterSetup.tenantId],
+    references: [tenant.id],
+  }),
   completedRouter: one(managedRouter, {
     fields: [managedRouterSetup.completedRouterId],
     references: [managedRouter.id],
@@ -147,6 +160,10 @@ export const managedRouterRelations = relations(managedRouter, ({ one, many }) =
   user: one(user, {
     fields: [managedRouter.userId],
     references: [user.id],
+  }),
+  tenant: one(tenant, {
+    fields: [managedRouter.tenantId],
+    references: [tenant.id],
   }),
   setup: one(managedRouterSetup, {
     fields: [managedRouter.setupId],
