@@ -25,17 +25,23 @@ routerBootstrapRoute.get("/:claimCode", async (c) => {
   const requestOrigin = forwardedHost
     ? `${forwardedProto}://${forwardedHost}`
     : new URL(c.req.url).origin;
-  const serverBaseUrl = env.ROUTER_PUBLIC_URL || requestOrigin;
+  const serverBaseUrl = env.SERVER_PUBLIC_URL || requestOrigin;
 
-  // Run high-level provisioning (generates keys, sets up IPs, syncs wg conf)
   const hostName = new URL(serverBaseUrl).hostname;
-  const provisionResult = await provisionWireguard(router.id, router.userId, hostName);
-  if ("error" in provisionResult) {
-    c.status(500);
-    return c.text(`# Provisioning failed: ${provisionResult.error}`);
+
+  // Bootstrap can be re-fetched (reloads, retries). Only generate keys once:
+  // re-provisioning rotates the router's key and breaks a working tunnel.
+  const existingWg = await db.query.managedRouterWireguard.findFirst({
+    where: eq(managedRouterWireguard.routerId, router.id),
+  });
+  if (!existingWg) {
+    const provisionResult = await provisionWireguard(router.id, router.userId, hostName);
+    if ("error" in provisionResult) {
+      c.status(500);
+      return c.text(`# Provisioning failed: ${provisionResult.error}`);
+    }
   }
 
-  // Update status to bootstrap_generated
   await db
     .update(managedRouter)
     .set({
@@ -44,7 +50,6 @@ routerBootstrapRoute.get("/:claimCode", async (c) => {
     })
     .where(eq(managedRouter.id, router.id));
 
-  // Retrieve the generated credentials
   const wg = await db.query.managedRouterWireguard.findFirst({
     where: eq(managedRouterWireguard.routerId, router.id),
   });
@@ -66,6 +71,8 @@ routerBootstrapRoute.get("/:claimCode", async (c) => {
     serverTunnelIp: wg.routerTunnelIp,
     serverEndpoint,
     serverBaseUrl,
+    apiUsername: router.apiUsername,
+    apiPassword: decryptSecret(router.apiPasswordEncrypted),
   });
 
   c.header("Content-Type", "text/plain");

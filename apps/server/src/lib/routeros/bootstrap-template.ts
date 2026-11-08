@@ -7,6 +7,8 @@ type BootstrapTemplateParams = {
   serverTunnelIp: string; // e.g. 10.100.0.1/32
   serverEndpoint: string; // public-ip:port
   serverBaseUrl: string; // e.g. http://api.yourdomain.com
+  apiUsername: string;
+  apiPassword: string;
 };
 
 function splitEndpoint(endpoint: string): { host: string; port: string } {
@@ -33,12 +35,13 @@ export function generateBootstrapTemplate(params: BootstrapTemplateParams): stri
     serverTunnelIp,
     serverEndpoint,
     serverBaseUrl,
+    apiUsername,
+    apiPassword,
   } = params;
 
   const serverAllowedIp = serverTunnelIp.split("/")[0] + "/32";
   const { host: endpointHost, port: endpointPort } = splitEndpoint(serverEndpoint);
 
-  // Clean trailing slashes from serverBaseUrl
   const normalizedBaseUrl = serverBaseUrl.replace(/\/+$/, "");
 
   return [
@@ -55,14 +58,20 @@ export function generateBootstrapTemplate(params: BootstrapTemplateParams): stri
     "# 3. Add SupaBill server as WireGuard Peer",
     `/interface/wireguard/peers/add interface="${interfaceName}" public-key="${serverPublicKey}" allowed-address="${serverAllowedIp}" endpoint-address="${endpointHost}" endpoint-port=${endpointPort} persistent-keepalive=25s comment="SupaBill Central Server"`,
     "",
-    "# 4. Security Hardening Firewall Rules",
+    "# 4. Enable the plain RouterOS API on 8728 (sync uses this)",
+    "/ip service set api disabled=no port=8728",
+    "/ip service set api-ssl disabled=yes",
+    `/user remove [find name="${apiUsername}"]`,
+    `/user add name="${apiUsername}" password="${apiPassword}" group=write disabled=no`,
+    "",
+    "# 5. Security Hardening Firewall Rules",
     "/ip/firewall/address-list/remove [find list=\"supabill-mgmt\"]",
     "/ip/firewall/address-list/add list=\"supabill-mgmt\" address=\"10.100.0.0/16\" comment=\"SupaBill Management IPs\"",
-    `/ip/firewall/filter/add chain=input src-address-list=\"supabill-mgmt\" protocol=tcp dst-port=8729 action=accept comment=\"Accept SupaBill API-SSL\"`,
-    `/ip/firewall/filter/add chain=input protocol=tcp dst-port=8728 action=drop comment=\"Block unencrypted plain API\"`,
+    `/ip/firewall/filter/add chain=input src-address-list="supabill-mgmt" protocol=tcp dst-port=8728 action=accept comment="Accept SupaBill API"`,
+    `/ip/firewall/filter/add chain=input protocol=tcp dst-port=8729 action=drop`,
     "",
-    "# 5. Execute Registration Callback to SupaBill Server",
-    ":local serial \"unknown\"",
+    "# 6. Execute Registration Callback to SupaBill Server",
+    ':local serial "unknown"',
     ":do { :set serial [/system routerboard get serial-number] } on-error={}",
     ":local version [/system resource get version]",
     ":local arch [/system resource get architecture-name]",

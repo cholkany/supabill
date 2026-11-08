@@ -64,12 +64,9 @@ export async function syncRouterConfig(routerId: string): Promise<void> {
     host: tunnelIp,
     user: router.apiUsername,
     password,
-    port: 8729, // Use API-SSL port 8729
+    port: router.apiPort,
     timeout: 12000,
     keepalive: false,
-    tls: {
-      rejectUnauthorized: false, // Allow self-signed certificates
-    },
   });
 
   try {

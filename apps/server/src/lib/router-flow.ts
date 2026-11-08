@@ -11,9 +11,10 @@ import {
 import { env } from "@supabill/env/server";
 
 import { decryptSecret, encryptSecret, generateRouterPassword } from "./router-crypto.js";
-import { applyRouterHotspotSetup, getRouterLiveSnapshot, probeRouter } from "./routeros-probe.js";
-import { provisionWireguard } from "./wireguard.js";
+import { getRouterLiveSnapshot, probeRouter } from "./routeros-probe.js";
+import { provisionWireguard, syncServerWireguardConf } from "./wireguard.js";
 import { generateClaimCode } from "./router/claim-code.js";
+import { boss } from "./jobs/queue.js";
 
 type SetupStatus = (typeof managedRouterSetup.$inferSelect)["status"];
 type RouterStatus = (typeof managedRouterStatusEnum.enumValues)[number];
@@ -24,7 +25,7 @@ type RouterDashboardData = {
   id: string;
   name: string;
   location: string;
-  status: RouterStatus;
+  status: RouterStatus | "online";
   wanPort: string;
   hotspotPorts: string[];
   createdAt: string;
@@ -69,8 +70,6 @@ type RouterDashboardData = {
     trafficTodayGb: number;
     trafficMonthGb: number;
     uniqueHotspotUsersToday: number;
-    revenueToday: number;
-    revenueMonth: number;
   };
   settings: {
     timezone: string;
@@ -83,6 +82,11 @@ type RouterDashboardData = {
 function nowIso() {
   return new Date().toISOString();
 }
+
+// Every dashboard subpage calls getRouterDashboard; cache the live snapshot
+// briefly so moving between tabs does not open a new RouterOS session.
+const SNAPSHOT_TTL_MS = 10_000;
+const snapshotCache = new Map<string, { at: number; data: RouterDashboardData }>();
 
 function toIso(value: Date | string | null | undefined) {
   if (!value) {
@@ -145,63 +149,6 @@ async function appendRouterLog(routerId: string, level: "info" | "warning" | "er
     level,
     message,
   });
-}
-
-function estimateRevenue(activeUsers: number) {
-  return Math.round(activeUsers * 2.8);
-}
-
-async function runBackgroundProvision({
-  routerId,
-  host,
-  apiPort,
-  apiUsername,
-  apiPasswordEncrypted,
-  hotspotPorts,
-}: {
-  routerId: string;
-  host: string;
-  apiPort: number;
-  apiUsername: string;
-  apiPasswordEncrypted: string;
-  hotspotPorts: string[];
-}) {
-  try {
-    await applyRouterHotspotSetup(
-      {
-        host,
-        port: apiPort,
-        username: apiUsername,
-        password: decryptSecret(apiPasswordEncrypted),
-      },
-      {
-        bridgeName: "supabill-hotspot",
-        ports: hotspotPorts,
-      },
-    );
-
-    await appendRouterLog(routerId, "info", "Background hotspot baseline configuration completed.");
-    await db
-      .update(managedRouter)
-      .set({
-        status: "ready",
-        lastError: null,
-        lastSeenAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(managedRouter.id, routerId));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Background configuration failed.";
-    await appendRouterLog(routerId, "warning", `Background setup warning: ${message}`);
-    await db
-      .update(managedRouter)
-      .set({
-        status: "error",
-        lastError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(managedRouter.id, routerId));
-  }
 }
 
 export async function listRoutersForUser(userId: string) {
@@ -293,8 +240,7 @@ export async function startRouterSetup({
     .set({ completedRouterId: routerId })
     .where(eq(managedRouterSetup.id, setupId));
 
-  void provisionWireguard(routerId, userId, new URL(serverBaseUrl).hostname);
-
+  await provisionWireguard(routerId, userId, new URL(serverBaseUrl).hostname);
   return {
     setupId,
     step: 2,
@@ -359,6 +305,11 @@ export async function markProvisionFetched({
   });
 
   if (!setup) {
+    return null;
+  }
+
+  // Setup links are onboarding credentials; expire them after a day.
+  if (Date.now() - setup.createdAt.getTime() > 24 * 60 * 60 * 1000) {
     return null;
   }
 
@@ -496,6 +447,17 @@ export async function completeSetup({
     return null;
   }
 
+  // Double-click / retry: completing twice must not insert twice or queue two syncs.
+  if (setup.status === "completed" && setup.completedRouterId) {
+    return {
+      setupId: setup.id,
+      step: 4 as const,
+      completed: true,
+      routerId: setup.completedRouterId,
+      statusMessage: "Router setup is already complete.",
+    };
+  }
+
   if (setup.status !== "reachable" && setup.status !== "completed") {
     return {
       error: "Run accessibility test before completing setup.",
@@ -562,23 +524,21 @@ export async function completeSetup({
       selectedHotspotPorts: normalized,
       completedRouterId: routerId,
       setupLogs: [
-        getSetupLogMessage("Setup completion requested. Background scripts launched."),
+        getSetupLogMessage("Setup completion requested. Configuration sync queued."),
         ...setup.setupLogs,
       ],
       updatedAt: new Date(),
     })
     .where(eq(managedRouterSetup.id, setup.id));
 
-  await appendRouterLog(routerId, "info", "Router setup completed. Background configuration started.");
+  await appendRouterLog(routerId, "info", "Router setup completed. Configuration sync queued.");
 
-  void runBackgroundProvision({
-    routerId,
-    host: setup.detectedHost,
-    apiPort: setup.apiPort,
-    apiUsername: setup.apiUsername,
-    apiPasswordEncrypted: setup.apiPasswordEncrypted,
-    hotspotPorts: normalized,
-  });
+  await db
+    .update(managedRouter)
+    .set({ status: "syncing", lastError: null, updatedAt: new Date() })
+    .where(eq(managedRouter.id, routerId));
+
+  await boss.send("router-sync", { routerId });
 
   return {
     setupId: setup.id,
@@ -602,6 +562,12 @@ export async function getRouterDashboard({
 
   if (!router) {
     return null;
+  }
+
+  const cacheKey = `${userId}:${routerId}`;
+  const cached = snapshotCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < SNAPSHOT_TTL_MS) {
+    return cached.data;
   }
 
   const routerLogs = await db.query.managedRouterLog.findMany({
@@ -661,7 +627,7 @@ export async function getRouterDashboard({
     })),
   ].slice(0, 80);
 
-  return {
+  const data: RouterDashboardData = {
     id: router.id,
     name: router.name,
     location: router.location,
@@ -705,8 +671,6 @@ export async function getRouterDashboard({
       trafficTodayGb: Number(((liveSnapshot?.txMbps ?? 0) * 0.28).toFixed(2)),
       trafficMonthGb: Number(((liveSnapshot?.txMbps ?? 0) * 8.4).toFixed(2)),
       uniqueHotspotUsersToday: activeUsers,
-      revenueToday: estimateRevenue(activeUsers),
-      revenueMonth: estimateRevenue(activeUsers) * 30,
     },
     settings: {
       timezone: router.timezone,
@@ -715,23 +679,36 @@ export async function getRouterDashboard({
       alertingEnabled: router.alertingEnabled,
     },
   };
+
+  if (snapshotCache.size >= 500) snapshotCache.clear();
+  snapshotCache.set(cacheKey, { at: Date.now(), data });
+  return data;
 }
 
 export async function deleteRouter(
   routerId: string,
   userId: string
-): Promise<{ success: boolean }> {
+): Promise<boolean> {
   const router = await db.query.managedRouter.findFirst({
     where: and(eq(managedRouter.id, routerId), eq(managedRouter.userId, userId)),
   });
 
   if (!router) {
-    return { success: false };
+    return false;
   }
 
+  snapshotCache.delete(`${userId}:${routerId}`);
   await db.delete(managedRouter).where(eq(managedRouter.id, routerId));
 
-  return { success: true };
+  // The WireGuard row cascades with the router, but the peer stays in the
+  // generated config / live interface until we rebuild it.
+  try {
+    await syncServerWireguardConf();
+  } catch (error) {
+    console.warn("[WireGuard] Failed to rebuild config after router delete:", error);
+  }
+
+  return true;
 }
 
 

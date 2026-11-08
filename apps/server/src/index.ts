@@ -4,7 +4,7 @@ import { env, getTrustedOrigins } from "@supabill/env/server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { getPlatformSnapshot, getTenantBySlug, getWireguardClientConfig } from "./lib/platform.js";
+import { rateLimit } from "./lib/rate-limit.js";
 import {
   completeSetup,
   deleteRouter,
@@ -26,7 +26,6 @@ import { exec as execCb } from "node:child_process";
 import { promisify } from "node:util";
 
 import { initializeJobs } from "./lib/jobs/index.js";
-import { routerHeartbeatRoute } from "./routes/router-heartbeat.js";
 import { routerBootstrapRoute } from "./routes/router-bootstrap.js";
 import { routerRegisterRoute } from "./routes/router-register.js";
 
@@ -36,12 +35,12 @@ import { routerRegisterRoute } from "./routes/router-register.js";
 // only interception point is here. The RosException is non-fatal — the dashboard
 // will return with whatever data was already collected before the crash point.
 process.on("uncaughtException", (error) => {
-  // RosException carries an `errno` string property; use that as the fingerprint.
-  if (error && typeof error === "object" && "errno" in error) {
-    console.error(`[RouterOS] Non-fatal library exception (errno=${(error as { errno: string }).errno}): ${(error as Error).message}`);
-    return; // absorb — do NOT call process.exit()
+  // RosException is the only error we can safely absorb; it carries `errno`.
+  if (error instanceof Error && error.constructor.name === "RosException") {
+    console.error(`[RouterOS] Non-fatal library exception: ${error.message}`);
+    return;
   }
-  // Re-surface genuinely fatal errors.
+  // Everything else is a real crash — let the supervisor restart us.
   console.error("[Fatal] Uncaught exception:", error);
   process.exit(1);
 });
@@ -56,7 +55,15 @@ const exec = promisify(execCb);
 // Best-effort: if a WG config already exists on disk, bring the interface up.
 // This makes `docker compose up` testable without first provisioning a router.
 void ensureWireguardInterfaceUpFromDisk();
-void initializeJobs();
+
+// Wait for the queue/workers before accepting requests, so setup completion can
+// enqueue its sync job immediately.
+try {
+  await initializeJobs();
+} catch (error) {
+  console.error("[Jobs] Failed to initialize background jobs. Exiting so the supervisor can restart.", error);
+  process.exit(1);
+}
 
 app.use(logger());
 app.use(
@@ -69,8 +76,13 @@ app.use(
   }),
 );
 
+// Rate-limit the bearer-token endpoints that unauthenticated routers call.
+// 120/min matches an onboarding batch while still throttling brute force.
+app.use("/bootstrap/*", rateLimit({ windowMs: 60_000, max: 120 }));
+app.use("/provision/*", rateLimit({ windowMs: 60_000, max: 120 }));
+app.use("/router/register/*", rateLimit({ windowMs: 60_000, max: 120 }));
+
 // Register custom Hono sub-routers
-app.route("/router/heartbeat", routerHeartbeatRoute);
 app.route("/bootstrap", routerBootstrapRoute);
 app.route("/router/register", routerRegisterRoute);
 
@@ -98,31 +110,6 @@ async function requireAuthenticatedUser(c: { req: { raw: Request } }) {
 
   return { ...session.user, tenantId };
 }
-
-app.get("/api/platform/overview", async (c) => {
-  const snapshot = await getPlatformSnapshot();
-  return c.json(snapshot);
-});
-
-app.get("/api/platform/tenant/:slug", async (c) => {
-  const tenant = await getTenantBySlug(c.req.param("slug"));
-
-  if (!tenant) {
-    return c.json({ message: "Tenant not found" }, 404);
-  }
-
-  return c.json(tenant);
-});
-
-app.get("/api/platform/wireguard/:routerId/:peerId", async (c) => {
-  const config = await getWireguardClientConfig(c.req.param("routerId"), c.req.param("peerId"));
-
-  if (!config) {
-    return c.json({ message: "WireGuard peer not found" }, 404);
-  }
-
-  return c.json(config);
-});
 
 // Dev-only: verify WG interface state inside the running container.
 app.get("/api/debug/wireguard", async (c) => {
@@ -327,18 +314,6 @@ app.post("/api/routers/:routerId/wireguard/probe", async (c) => {
   return c.json(result);
 });
 
-app.get("/api/routers/:routerId/wireguard/client-config", async (c) => {
-  const user = await requireAuthenticatedUser(c);
-  if (!user) return c.json({ message: "Authentication required." }, 401);
-
-  const status = await getWireguardStatus(c.req.param("routerId"), user.id);
-  if (!status || !status.configured) return c.json({ message: "WireGuard not configured." }, 404);
-
-  c.header("Content-Type", "text/plain");
-  c.header("Content-Disposition", `attachment; filename="supabill-wg.conf"`);
-  return c.body((status as { clientConfig: string }).clientConfig);
-});
-
 app.get("/provision/:provisionToken", async (c) => {
   const provisionToken = c.req.param("provisionToken");
   const sourceHostHeader = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip");
@@ -362,7 +337,7 @@ app.get("/provision/:provisionToken", async (c) => {
     "/ip service set api port=8728",
     "/ip service set api-ssl disabled=yes",
     `/user remove [find name="${provisioned.apiUsername}"]`,
-    `/user add name="${provisioned.apiUsername}" password="${provisioned.apiPassword}" group=full disabled=no`,
+    `/user add name="${provisioned.apiUsername}" password="${provisioned.apiPassword}" group=write disabled=no`,
     wgScript,
     "/system note set show-at-login=yes note=\"Managed by Supabill\"",
     `/log info \"Supabill setup ${provisioned.setupId} ready\"`,
@@ -381,9 +356,6 @@ app.get("/", (c) => {
     version: "0.1.0",
     endpoints: [
       "/api/auth/*",
-      "/api/platform/overview",
-      "/api/platform/tenant/:slug",
-      "/api/platform/wireguard/:routerId/:peerId",
       "/api/routers",
       "/api/routers/setup/start",
       "/api/routers/setup/:setupId",
@@ -392,6 +364,8 @@ app.get("/", (c) => {
       "/api/routers/:routerId",
       "/api/routers/:routerId/wireguard/probe",
       "/provision/:provisionToken",
+      "/bootstrap/:claimCode",
+      "/router/register/:claimCode",
     ],
   });
 });

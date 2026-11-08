@@ -57,7 +57,10 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_URL=postgresql://postgres:password@db:5432/supabill
-      - BETTER_AUTH_SECRET=supabill-secret-key-development-12345
+      # Required. Generate with: openssl rand -base64 32
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required (32+ chars)}
+      # Required so rotating the auth secret does not make stored router credentials unreadable.
+      - ROUTER_CREDENTIALS_KEY=${ROUTER_CREDENTIALS_KEY:?ROUTER_CREDENTIALS_KEY is required (32+ chars)}
       # Public URL users open in the browser (web app + /api/auth proxy). Set APP_URL in Dokploy.
       - BETTER_AUTH_URL=${APP_URL:-http://localhost:3000}
       - CORS_ORIGIN=${APP_URL:-http://localhost:3000}
@@ -67,12 +70,14 @@ services:
       # SERVER_PUBLIC_URL: base URL embedded in the router's provision script.
       #   The MikroTik fetches this URL — must be reachable from the router's network.
       #   Example: https://your-ngrok-url.ngrok-free.app  or  http://203.0.113.1:3000
-      - SERVER_PUBLIC_URL=${SERVER_PUBLIC_URL:-https://1957-41-79-122-229.ngrok-free.app}
+      - SERVER_PUBLIC_URL=${SERVER_PUBLIC_URL:-}
       #
       # WG_PUBLIC_HOST: public IP/hostname the MikroTik dials for WireGuard.
       #   Must be reachable on UDP port 51820 from the router's network.
       #   Same host as SERVER_PUBLIC_URL but without scheme/port.
-      - WG_PUBLIC_HOST=${WG_PUBLIC_HOST:-1957-41-79-122-229.ngrok-free.app}
+      - WG_PUBLIC_HOST=${WG_PUBLIC_HOST:-}
+      - WG_SERVER_PRIVATE_KEY=${WG_SERVER_PRIVATE_KEY:?WG_SERVER_PRIVATE_KEY is required}
+      - WG_SERVER_PUBLIC_KEY=${WG_SERVER_PUBLIC_KEY:?WG_SERVER_PUBLIC_KEY is required}
       - WG_LISTEN_PORT=51820
       # Path inside the server container where peer configs are written (also mounted in wireguard container)
       - WG_CONFS_DIR=/wireguard/wg_confs

@@ -39,10 +39,6 @@ async function createQueues() {
     "router-sync",
   );
 
-  await boss.createQueue(
-    "router-heartbeat-check",
-  );
-
   console.log(
     "[PgBoss] All queues created",
   );

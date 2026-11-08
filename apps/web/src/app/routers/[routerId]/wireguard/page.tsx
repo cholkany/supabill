@@ -58,7 +58,6 @@ export default function WireguardPage({ params }: { params: Promise<{ routerId: 
   const [probing, setProbing] = useState(false);
   const [probe, setProbe] = useState<WireguardProbeResult | null>(null);
   const [wanHost, setWanHost] = useState("");
-  const [showConfig, setShowConfig] = useState(false);
 
   useEffect(() => {
     params.then((p) => setRouterId(p.routerId));
@@ -248,49 +247,6 @@ export default function WireguardPage({ params }: { params: Promise<{ routerId: 
                 </p>
               )}
             </CardContent>
-          </Card>
-
-          {/* Client .conf */}
-          <Card className="rounded-2xl border-foreground/10 bg-background/90">
-            <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
-              <div>
-                <CardTitle className="text-base">Client config</CardTitle>
-                <CardDescription>
-                  Import into WireGuard app on any device to connect to this router remotely.
-                </CardDescription>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setShowConfig((v) => !v)}>
-                {showConfig ? "Hide" : "Show"} config
-              </Button>
-            </CardHeader>
-            {showConfig && (
-              <CardContent className="grid gap-3">
-                <pre className="overflow-x-auto rounded-xl border border-foreground/10 bg-foreground/[0.04] p-4 text-xs leading-relaxed">
-                  {wg.clientConfig}
-                </pre>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      navigator.clipboard
-                        .writeText(wg.clientConfig)
-                        .then(() => toast.success("Config copied"))
-                    }
-                  >
-                    Copy config
-                  </Button>
-                  <a
-                    href={`/api/routers/${routerId}/wireguard/client-config`}
-                    download="supabill-wg.conf"
-                  >
-                    <Button variant="outline" size="sm">
-                      Download .conf
-                    </Button>
-                  </a>
-                </div>
-              </CardContent>
-            )}
           </Card>
 
           {/* Re-provision */}

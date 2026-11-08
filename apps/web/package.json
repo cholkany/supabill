@@ -9,15 +9,12 @@
     "start": "next start"
   },
   "dependencies": {
-    "@ai-sdk/react": "^3.0.118",
     "@base-ui/react": "^1.3.0",
-    "@fontsource-variable/inter": "^5.2.8",
     "@hugeicons/core-free-icons": "^3.3.0",
     "@hugeicons/react": "^0.3.0",
     "@supabill/auth": "workspace:*",
     "@supabill/env": "workspace:*",
     "@tanstack/react-form": "^1.27.3",
-    "@untitledui/icons": "^0.0.22",
     "babel-plugin-react-compiler": "^1.0.0",
     "better-auth": "catalog:",
     "class-variance-authority": "^0.7.1",
@@ -29,34 +26,20 @@
     "postcss": "^8.5.10",
     "radix-ui": "^1.4.3",
     "react": "^19.2.3",
-    "react-aria-components": "^1.17.0",
     "react-dom": "^19.2.3",
     "shadcn": "^3.6.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
-    "tailwindcss-animate": "^1.0.7",
-    "tailwindcss-react-aria-components": "^2.1.0",
-    "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
-    "zod": "catalog:",
-    "zustand": "^5.0.5"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@jest/globals": "catalog:",
     "@supabill/config": "workspace:*",
     "@tailwindcss/postcss": "^4.2.2",
-    "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/jest": "catalog:",
     "@types/node": "^20",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "jest": "catalog:",
-    "jest-environment-jsdom": "catalog:",
     "tailwindcss": "^4.2.2",
-    "ts-jest": "catalog:",
     "typescript": "catalog:"
   }
 }

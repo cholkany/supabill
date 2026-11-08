@@ -22,9 +22,6 @@ Supabill is a MikroTik billing platform inspired by Mikhmon, rebuilt as a multit
 
 ## Key endpoints
 
-- `GET /api/platform/overview`
-- `GET /api/platform/tenant/:slug`
-- `GET /api/platform/wireguard/:routerId/:peerId`
 - `GET|POST /api/auth/*`
 - `GET /api/routers`
 - `POST /api/routers/setup/start`
@@ -33,6 +30,8 @@ Supabill is a MikroTik billing platform inspired by Mikhmon, rebuilt as a multit
 - `POST /api/routers/setup/:setupId/complete`
 - `GET /api/routers/:routerId`
 - `GET /provision/:provisionToken`
+- `GET /bootstrap/:claimCode`
+- `POST /router/register/:claimCode`
 
 ## Setup
 
@@ -44,8 +43,10 @@ Supabill is a MikroTik billing platform inspired by Mikhmon, rebuilt as a multit
    - `CORS_ORIGIN` — usually the same as `BETTER_AUTH_URL`
    - `TRUSTED_ORIGINS` (optional) — comma-separated extra origins
    - `APP_URL` (Docker/Dokploy) — sets both `BETTER_AUTH_URL` and `CORS_ORIGIN`
-   - `ROUTER_CREDENTIALS_KEY` (min 32 chars, for encrypted router API credentials at rest)
-   - `ROUTER_PROVISION_BASE_URL` (optional public base URL used in generated provision scripts)
+   - `ROUTER_CREDENTIALS_KEY` (min 32 chars, required; encrypts router API credentials at rest)
+   - `WG_SERVER_PRIVATE_KEY` / `WG_SERVER_PUBLIC_KEY` (required to provision routers)
+   - `WG_PUBLIC_HOST` (public host routers dial for WireGuard; optional but required for the endpoint to appear in scripts)
+   - `SERVER_PUBLIC_URL` (optional public API base URL used in generated scripts)
    - `ROUTER_API_TIMEOUT_MS` (optional, defaults to `7000`)
 3. Start PostgreSQL or use the included database compose setup
 4. Apply migrations with `pnpm run db:migrate` (Docker Compose runs this automatically via the `migrate` service before the API starts). For a brand-new local database, `pnpm run db:push` also works.

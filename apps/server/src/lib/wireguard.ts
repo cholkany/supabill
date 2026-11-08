@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { exec } from "node:child_process";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@supabill/db";
 import { managedRouter, managedRouterWireguard } from "@supabill/db/schema";
@@ -105,7 +105,15 @@ export function generateWireguardScript(options: WireguardScriptOptions): string
 // Writes/regenerates the WireGuard server config that the Docker wireguard
 // container reads from WG_CONFS_DIR. Each router is a [Peer] section.
 
-async function syncServerWireguardConf(): Promise<void> {
+let confWriteChain: Promise<void> = Promise.resolve();
+
+async function writeFileAtomic(path: string, content: string): Promise<void> {
+  const tmp = `${path}.tmp`;
+  await fs.writeFile(tmp, content, "utf8");
+  await fs.rename(tmp, path);
+}
+
+async function writeServerWireguardConf(): Promise<void> {
   const confsDir = env.WG_CONFS_DIR;
   if (!confsDir) return; // Not configured — skip (dev without Docker)
 
@@ -137,10 +145,10 @@ async function syncServerWireguardConf(): Promise<void> {
   const legacyConfPath = `${confsDir}/${LEGACY_WG_IFACE}.conf`;
 
   await fs.mkdir(confsDir, { recursive: true });
-  await fs.writeFile(confPath, conf, "utf8");
+  await writeFileAtomic(confPath, conf);
   // Backward-compatible: older deployments used the `supabill.conf` name.
   // Keep both in sync so existing containers keep working during migration.
-  await fs.writeFile(legacyConfPath, conf, "utf8");
+  await writeFileAtomic(legacyConfPath, conf);
 
   // Two-phase apply:
   //   • wg syncconf — atomically updates peers on an existing interface (no disconnects)
@@ -162,6 +170,14 @@ async function syncServerWireguardConf(): Promise<void> {
       console.log("[WireGuard] Peer config applied.");
     }
   });
+}
+
+export function syncServerWireguardConf(): Promise<void> {
+  // Serialize writes: two concurrent provisions must not overwrite each other
+  // with a config rebuilt from a stale read.
+  const run = confWriteChain.catch(() => undefined).then(writeServerWireguardConf);
+  confWriteChain = run;
+  return run;
 }
 
 export async function ensureWireguardInterfaceUpFromDisk(): Promise<void> {
@@ -303,39 +319,42 @@ export async function provisionWireguard(routerId: string, userId: string, serve
   // serverKeys  = Supabill's keypair  (private stays in DB / env, public goes to MikroTik)
   const routerKeys = generateWireguardKeypair();
   const serverKeys = getWireguardServerConfig();
-  const routerIp = await allocateRouterTunnelIp();
   const serverIp = "10.100.0.1/32";
 
   const wgId = crypto.randomUUID();
-  const existing = await db.query.managedRouterWireguard.findFirst({
-    where: eq(managedRouterWireguard.routerId, routerId),
+
+  // One lock for the whole allocate-and-insert step: two simultaneous setups
+  // must not hand out the same tunnel IP.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('supabill_wg_ipam'))`);
+
+    const routerIp = await allocateRouterTunnelIp(tx);
+    const existing = await tx.query.managedRouterWireguard.findFirst({
+      where: eq(managedRouterWireguard.routerId, routerId),
+    });
+
+    const record = {
+      routerInterfaceName: SUPABILL_WG_IFACE,
+      routerListenPort: serverKeys.listenPort,
+      routerPrivateKeyEncrypted: encryptSecret(routerKeys.privateKey),
+      routerPublicKey: routerKeys.publicKey,
+      routerTunnelIp: serverIp,   // Supabill's tunnel IP  e.g. 10.100.0.1/32
+      peerPrivateKeyEncrypted: encryptSecret(serverKeys.privateKey),
+      peerPublicKey: serverKeys.publicKey,
+      peerTunnelIp: routerIp + "/32",     // MikroTik's tunnel IP  e.g. 10.100.0.2/32
+      wanHost: serverHostname || normalizePublicHost(env.WG_PUBLIC_HOST) || null,
+      status: "applied" as const,
+      appliedAt: new Date(),
+      lastError: null,
+      updatedAt: new Date(),
+    };
+
+    if (existing) {
+      await tx.update(managedRouterWireguard).set(record).where(eq(managedRouterWireguard.routerId, routerId));
+    } else {
+      await tx.insert(managedRouterWireguard).values({ id: wgId, routerId, ...record });
+    }
   });
-
-  const record = {
-    routerInterfaceName: SUPABILL_WG_IFACE,
-    routerListenPort: serverKeys.listenPort,
-    routerPrivateKeyEncrypted: encryptSecret(routerKeys.privateKey),
-    routerPublicKey: routerKeys.publicKey,
-    routerTunnelIp: serverIp,   // Supabill's tunnel IP  e.g. 10.100.0.1/32
-    peerPrivateKeyEncrypted: encryptSecret(serverKeys.privateKey),
-    peerPublicKey: serverKeys.publicKey,
-    peerTunnelIp: routerIp + "/32",     // MikroTik's tunnel IP  e.g. 10.100.0.2/32
-    wanHost: serverHostname || normalizePublicHost(env.WG_PUBLIC_HOST) || null,
-    status: "pending" as const,
-    lastError: null,
-    updatedAt: new Date(),
-  };
-
-  if (existing) {
-    await db.update(managedRouterWireguard).set(record).where(eq(managedRouterWireguard.routerId, routerId));
-  } else {
-    await db.insert(managedRouterWireguard).values({ id: wgId, routerId, ...record });
-  }
-
-  await db
-    .update(managedRouterWireguard)
-    .set({ status: "applied", appliedAt: new Date(), lastError: null, updatedAt: new Date() })
-    .where(eq(managedRouterWireguard.routerId, routerId));
 
   // Write/refresh the server-side WireGuard peer config
   await syncServerWireguardConf();

@@ -45,7 +45,7 @@ export type RouterDashboardData = {
   id: string;
   name: string;
   location: string;
-  status: "pending" | "bootstrap_generated" | "connecting" | "connected" | "syncing" | "ready" | "error";
+  status: "pending" | "bootstrap_generated" | "connecting" | "connected" | "syncing" | "ready" | "error" | "online";
   wanPort: string;
   hotspotPorts: string[];
   createdAt: string;
@@ -90,8 +90,6 @@ export type RouterDashboardData = {
     trafficTodayGb: number;
     trafficMonthGb: number;
     uniqueHotspotUsersToday: number;
-    revenueToday: number;
-    revenueMonth: number;
   };
   settings: {
     timezone: string;
@@ -236,7 +234,6 @@ export type WireguardStatus =
       endpoint: string;
       listenPort: number;
       wanHost: string | null;
-      clientConfig: string;
     };
 
 export async function getWireguardStatus(

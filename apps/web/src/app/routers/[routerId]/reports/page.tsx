@@ -25,15 +25,6 @@ export default async function RouterReportsPage({
           <p>Unique users today: {router.reports.uniqueHotspotUsersToday}</p>
         </CardContent>
       </Card>
-      <Card className="rounded-2xl border-foreground/10 bg-background/90">
-        <CardHeader>
-          <CardTitle>Revenue report</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-1 text-sm text-muted-foreground">
-          <p>Revenue today: ${router.reports.revenueToday}</p>
-          <p>Revenue this month: ${router.reports.revenueMonth}</p>
-        </CardContent>
-      </Card>
     </section>
   );
 }

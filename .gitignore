@@ -48,3 +48,9 @@ coverage
 .cache
 tmp
 temp
+
+# Generated at runtime (contains the WireGuard private key)
+wireguard/wg_confs/
+
+# Local AI session transcripts
+session-*.md

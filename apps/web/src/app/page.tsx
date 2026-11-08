@@ -19,14 +19,6 @@ export default function Home() {
               >
                 Open routers
               </a>
-              <a
-                className="inline-flex h-11 items-center rounded-full border border-foreground/10 px-5 text-sm font-medium"
-                href="http://localhost:3000/api/platform/overview"
-                target="_blank"
-                rel="noreferrer"
-              >
-                View API
-              </a>
             </div>
           </div>
           <div className="grid gap-3 rounded-[1.75rem] border border-foreground/10 bg-foreground/[0.03] p-4">

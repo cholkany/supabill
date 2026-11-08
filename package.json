@@ -10,8 +10,8 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
+    "test": "turbo test",
     "dev:local": "turbo dev --filter=server --filter=web",
-    "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
     "dev:server": "turbo -F server dev",
     "db:push": "turbo -F @supabill/db db:push",
@@ -34,5 +34,10 @@
     "turbo": "^2.6.3",
     "typescript": "catalog:"
   },
-  "packageManager": "pnpm@10.15.1"
+  "packageManager": "pnpm@10.15.1",
+  "pnpm": {
+    "overrides": {
+      "pg": "8.21.0"
+    }
+  }
 }

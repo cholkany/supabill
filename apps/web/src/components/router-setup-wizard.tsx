@@ -7,8 +7,10 @@ import { toast } from "sonner";
 import { CheckCircle2, Circle, Copy, Loader2, RefreshCw, Terminal, Wifi } from "lucide-react";
 
 import {
+  completeRouterSetup,
   getRouterSetupState,
   startRouterSetupStep1,
+  testRouterSetupAccessibility,
   type RouterSetupState,
 } from "@/lib/router-flow";
 import { Button } from "@/components/ui/button";
@@ -93,6 +95,7 @@ export default function RouterSetupWizard() {
   const [setupState, setSetupState] = useState<RouterSetupState | null>(null);
   const [polling, setPolling] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const finalizeRef = useRef(false);
 
   const canSubmitStep1 = routerName.trim().length >= 2 && location.trim().length >= 2;
 
@@ -130,6 +133,27 @@ export default function RouterSetupWizard() {
         stopPolling();
         toast.error("Router provisioning encountered an error. Check setup logs.");
         return;
+      }
+
+      // Guided flow: once the router has fetched its script, run the
+      // connectivity test and complete the setup. Retried on the next tick
+      // until the router finishes importing the script.
+      if (refreshed.provisionFetched && !finalizeRef.current) {
+        finalizeRef.current = true;
+        try {
+          const tested = await testRouterSetupAccessibility(setupId);
+          if (tested.hotspotCandidatePorts.length === 0) {
+            throw new Error("No hotspot ports found on the router.");
+          }
+          await completeRouterSetup({
+            setupId,
+            selectedHotspotPorts: tested.hotspotCandidatePorts,
+          });
+          toast.success("Router configured. Waiting for the sync job…");
+        } catch (error) {
+          finalizeRef.current = false;
+          toast.error(error instanceof Error ? error.message : "Could not finish setup.");
+        }
       }
     } catch {
       // silently ignore transient polling errors
@@ -174,6 +198,7 @@ export default function RouterSetupWizard() {
 
   function handleManualRefresh() {
     if (!setupState) return;
+    finalizeRef.current = false;
     void pollStatus(setupState.setupId);
   }
 
